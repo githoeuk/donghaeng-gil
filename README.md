@@ -93,4 +93,3 @@ gradle/wrapper/     Gradle 실행 환경
 `.gitignore`는 빌드 산출물, Android Studio 개인 설정, 로컬 SDK 경로, 서명 키 및 환경변수를 제외합니다. DB나 API 사용 여부와 관계없이 필요합니다.
 
 현재 별도의 오픈소스 라이선스는 지정하지 않았습니다.
-

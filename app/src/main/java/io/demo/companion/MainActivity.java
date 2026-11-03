@@ -53,4 +53,3 @@ public class MainActivity extends Activity {
  }
  @Override public void onPictureInPictureModeChanged(boolean active,Configuration config){super.onPictureInPictureModeChanged(active,config);controls.setVisibility(active?View.GONE:View.VISIBLE);show("onPiPChanged="+active);}
 }
-
