@@ -14,7 +14,9 @@
 - 도착 예정 시간 상태 알림 시험
 - 표준 Picture-in-Picture(PiP) 지원 여부 시험
 
-실제 차량 간 통신, 사용자·그룹 관리, 위치 공유, ETA 계산, 내비게이션 목적지 변경은 아직 구현하지 않았습니다. 화면과 알림에 나타나는 인물·목적지·도착시간은 고정된 예시 데이터입니다.
+실제 차량 간 통신, 사용자·그룹 관리, 위치 공유는 아직 구현하지 않았습니다. 메인 화면과 알림에 나타나는 인물·목적지·도착시간은 고정된 예시 데이터입니다.
+
+별도의 debug 진단 화면에서 **NaviHelper 위치 조회, 목적지별 ETA 계산, 경로 안내 중 남은 시간 수신, Android GPS 좌표 갱신**을 검증했습니다. 내비 좌표와 GPS가 일치하지 않는 제한도 확인했습니다. [위치·ETA 검증 결과와 재현 방법](docs/pleos-location-eta-verification.md)을 참고하세요.
 
 ## 실행 환경
 
@@ -28,7 +30,7 @@
 | 검증 환경 | Pleos Connect v2.1.0 에뮬레이터, Android API 34 |
 | 애플리케이션 ID | `io.demo.companion` |
 
-DB, 백엔드 서버, 외부 API 키, Pleos SDK 의존성 없이 Android 플랫폼 API만 사용하는 테스트 앱입니다. 최초 빌드 시 Gradle과 Android 빌드 도구 다운로드를 위한 인터넷 연결은 필요할 수 있습니다.
+DB, 백엔드 서버, 외부 API 키 없이 실행하는 테스트 앱입니다. debug 빌드의 진단 기능은 공식 Pleos Maven 저장소의 NaviHelper 3.0.5를 사용하며, release 빌드에는 진단 Activity와 SDK 의존성을 포함하지 않습니다. 최초 빌드에는 Gradle·Android 빌드 도구·SDK 다운로드를 위한 인터넷 연결이 필요할 수 있습니다.
 
 ## 빌드 및 설치
 

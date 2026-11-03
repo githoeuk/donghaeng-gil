@@ -4,3 +4,6 @@ android {
  compileSdk 35
  defaultConfig { applicationId 'io.demo.companion'; minSdk 28; targetSdk 34; versionCode 1; versionName '0.1' }
 }
+dependencies {
+ debugImplementation 'ai.pleos.playground:NaviHelper:3.0.5'
+}

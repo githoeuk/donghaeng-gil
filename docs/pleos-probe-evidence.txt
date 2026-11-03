@@ -1,0 +1,20 @@
+Pleos emulator-only SDK verification. Test date: 2026-11-04 KST; emulator timestamps differ from host.
+All coordinates are emulator/test data. Selected original SDK callback log lines follow.
+
+11-03 12:05:45.275 17534 17534 I DonghaengProbe: CONNECTED
+11-03 12:06:42.945 25400 25400 I DonghaengProbe: CONNECTED
+11-03 12:06:42.945 25400 25400 I DonghaengProbe: REQUEST_TRIP synthetic destination 37.4200,127.1000
+11-03 12:08:21.872  9325  9325 I DonghaengProbe: CONNECTED
+11-03 12:08:21.873  9325  9325 I DonghaengProbe: REQUEST_TRIP synthetic destination 37.4200,127.1000
+11-03 12:08:22.265  9325  9353 I DonghaengProbe: TRIP distanceMeters=1876 etaSeconds=300
+11-03 12:08:27.940  9325  9325 I DonghaengProbe: REQUEST_TRIP synthetic destination 37.5000,127.0300
+11-03 12:08:28.132  9325  9539 I DonghaengProbe: TRIP distanceMeters=14068 etaSeconds=1260
+11-03 12:08:30.316  9325  9539 I DonghaengProbe: ROUTE_STARTED RouteStartInfo(duration=300, distance=1800, tollFare=0, name=Donghaeng diagnostic destination, remainDestinationChargingValue=77171)
+11-03 12:08:30.322  9325  9540 I DonghaengProbe: NAVIGATION_STATUS ROUTE_DRIVE
+11-03 12:08:45.954  9325  9325 I DonghaengProbe: CANCEL_TEST_ROUTE
+11-03 12:08:48.120  9325  9540 I DonghaengProbe: ROUTE_CANCELLED
+11-03 12:10:04.176 16598 16598 I DonghaengProbe: CONNECTED
+11-03 12:08:32.506  9325  9539 I DonghaengProbe: DESTINATION DestinationInfo(latitude=37.42, longitude=127.1, displayLatitude=null, displayLongitude=null, name=Donghaeng diagnostic destination, address=수정구 시흥동, remainDistance=1800, remainTime=300, tollFare=0, poiId=, poiSubId=null, poiProvider=)
+11-03 12:10:04.931 16598 16598 I DonghaengProbe: GPS_UPDATE latitude=37.41272 longitude=127.09468 accuracyMeters=5.0 ageMs=658
+11-03 12:10:12.565 16598 16598 I DonghaengProbe: GPS_UPDATE latitude=37.41372 longitude=127.09568 accuracyMeters=5.0 ageMs=4
+11-03 12:10:34.894 16598 16615 I DonghaengProbe: CURRENT_LOCATION CurrentLocationInfo(latitude=37.4127212, longitude=127.094681, heading=0.0, address=수정구 시흥동, routeId=, currentRouteIndex=0)
