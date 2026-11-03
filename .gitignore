@@ -1,0 +1,30 @@
+# Gradle / Android build output
+.gradle/
+**/build/
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+*.apks
+
+# Local development settings
+local.properties
+.idea/
+*.iml
+*.hprof
+captures/
+
+# Environment variables and signing credentials
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore.properties
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Explicit submission artifacts may be added here
+!artifacts/*.apk
