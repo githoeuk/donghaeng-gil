@@ -1,0 +1,16 @@
+package io.demo.companion;
+
+/** All callbacks on the UI thread. Implementations own network/auth/session details. */
+public interface SharingTransport {
+    interface Listener { void onChanged(SharingModels.Snapshot snapshot); }
+    void setListener(Listener listener);
+    SharingModels.Snapshot snapshot();
+    void createGroup();
+    void joinGroup(String inviteCode);
+    void startSharing();
+    void stopSharing();
+    void leaveGroup();
+    void send(SharingModels.MessageKind kind);
+    void acknowledge(String messageId);
+    void close();
+}

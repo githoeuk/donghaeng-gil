@@ -69,6 +69,7 @@ public class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
         if (BuildConfig.DEBUG) {
+            actions.addView(button("모의 공유 (정차 중)", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity"))));
             actions.addView(button("알림 시험", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".NotificationDemoActivity"))));
         }
         root.addView(actions);
