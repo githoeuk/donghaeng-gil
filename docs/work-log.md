@@ -100,3 +100,54 @@ Pleos Connect v2.1.0 / `emulator-5554` / 사용자 10에 APK를 설치하고 다
 - `docs: record journey verification and refresh demo APK` — README·설계·검증·작업 기록과 최신 설치용 Debug APK를 함께 정리한 문서·산출물 커밋.
 
 커밋 과정에서 코드의 의미를 바꾸는 수정은 하지 않았으며 일부 파일 끝의 불필요한 빈 줄만 정리했다. 앞서 통과한 91개 검사와 Debug·Release 빌드 결과는 위 구현 검증 절을 따른다. 커밋을 위해 빌드·에뮬레이터 시험을 다시 실행하지는 않았다. 원격 푸시는 하지 않았다.
+
+## 2026-11-04 — 제출용 Release 범위와 작업 가이드라인 수립
+
+사용자 요청으로 `docs/submission-release-guidelines.md`를 작성했다. 공식 제출 안내를 재확인하고 공식 요구와 프로젝트 자체 품질 기준을 구분했다.
+
+- 1차 제출 범위는 실제 Pleos 정보 화면 + 명시적으로 구분된 정차 전용 모의 공유 시연이다. SDK 진단·강제 경로 시험·기존 알림 시험은 제외한다.
+- 현재 Debug 전용 모의 기능을 제출 Release로 자동 포함시키지 않는다. 후속 작업에서 submissionRelease / standardRelease 구분과 전용 모의 소스셋을 적용할 계획으로 기록했다.
+- 주행·정차·상태 미확인에 따른 조작 제한, 서명 키 관리·누락 시 빌드 실패·서명/설치 검증, apk 폴더·최종 팀명 기반 파일명·버전·해시 기록 기준을 정했다.
+- 실제 팀명, 실제 키 보관 위치·alias·비밀번호는 미정이다. 이번 작업에서 키나 APK를 생성하지 않았다.
+- 저장소 루트 `AGENTS.md`에 작업 전 가이드라인 참조 규칙을 추가하고 README에 링크를 연결했다. 부모 `D:\projects\AGENTS.md`는 변경하지 않았다.
+- 문서·작업 규칙만 변경했다. 앱·Gradle·권한·서명 설정은 변경하지 않았고 빌드·에뮬레이터 시험은 실행하지 않았다. 커밋·푸시하지 않았다.
+- 검증: 문서 링크 대상 존재와 Git 변경 범위·공백 검사 확인. 현재 구현이 새 제출 기준을 모두 충족했다는 의미는 아니다.
+
+공식 출처: https://appdevchallenge.auto-hmg.io/guide/submission 및 https://appdevchallenge.auto-hmg.io/guide/judging-awards (2026-11-04 확인).
+
+## 2026-11-04 — 일반·제출 Release 분리와 모의 기능 소스셋 구성
+
+### 구현
+
+- `app/build.gradle`: distribution flavor로 standard/submission을 정의해 standardDebug·submissionDebug·standardRelease·submissionRelease 네 변형을 구성했다. applicationId·SDK 버전·기존 내비 기능은 유지했다. 두 Release는 debuggable=false다.
+- 모의 포함 설정은 `BuildConfig.HAS_SHARING_DEMO`로 분리했다. Debug는 모두 모의를 포함하며, Release는 submission만 포함한다. DEBUG=true로 Release를 위장하지 않는다.
+- `MockSharingTransport.java`, `SharingDemoActivity.java`를 src/debug에서 **src/demo**로 이동했다. 별도 demo 매니페스트의 Activity는 exported=false이며 DUMP 권한이 없다. src/debug 전체를 제출용에 포함하지 않아 SDK 진단·강제 경로 시험·기존 알림 시험과 NAVI_ROUTE_SEARCH 권한은 Release에서 제외된다.
+- MainActivity에 명시적인 모의 안내를 추가했다. Debug에서만 안내를 확인하고 개발용 시연을 실행할 수 있다. 실제 정차 상태 SDK를 아직 연결하지 않았으므로 submissionRelease는 시연 안내에서 실행을 잠그며, Activity 자체도 같은 조건으로 모의 엔진을 시작하지 않는다. 이는 안전 기능 완료가 아니라 미확인 상태에서의 임시 차단이다.
+- 모의 화면 재시작 시 메시지 렌더 캐시를 초기화해 종료·복귀 후 빈 메시지 상태가 올바르게 그려지게 했다.
+- 서명 설정은 만들지 않았다. `verifyReleaseDistributionConfigured`는 의도적으로 Release APK/AAB 패키징을 차단한다. 후속 서명·안전 검증 단계에서 실제 준비 상태 검사로 교체해야 한다. unsigned나 Debug 서명으로 대체하는 옵션은 없다.
+- `scripts/test-state.ps1`의 이동된 모의 소스 경로를 갱신하고 `scripts/verify-build-variants.ps1`에 변형별 컴파일·매니페스트·클래스·플래그 검사 56개를 추가했다.
+- README, 통신 설계, 제출 가이드라인을 현재 구성·잠김 상태·검증 명령에 맞춰 갱신했다. 앞서 미커밋이던 가이드라인·작업 규칙은 보존했다. 저장소 밖의 로컬 빌드 스크립트는 수정하지 않았다.
+
+### 검증
+
+- 독립 Java 상태 검사 **91개 통과**.
+- 네 변형 모두 Java 컴파일·리소스 처리·매니페스트 병합 성공. assembleRelease/package/bundle은 실행하지 않았다.
+- 생성된 변형별 클래스·매니페스트·BuildConfig에 대한 **56개 구성 검사 통과**. standardRelease 모의 제외, submissionRelease 모의 포함, Release 진단 도구 제외, 동일 applicationId, Release 비디버깅, 비공개 모의 Activity, 새 INTERNET 권한 없음 확인.
+- `verifyReleaseDistributionConfigured` 단독 실행은 `RELEASE_DISTRIBUTION_NOT_CONFIGURED`로 **의도한 실패**를 확인했다. 컴파일 실패와 구분한다.
+- 두 Release의 APK/AAB 작업 그래프를 --dry-run으로 확인해 패키징 전에 차단 작업이 실행되도록 연결된 것을 검증했다. 실제 패키징은 하지 않았다.
+- 기존 app/build/outputs/apk 파일 목록과 SHA-256을 전후 비교해 **APK 생성·변경 없음**을 확인했다. artifacts의 이전 개발용 APK도 갱신하지 않았다. 서명 키·서명 설정·apk/ 제출 파일을 만들지 않았다.
+- 이번 검증은 컴파일·구성 검증이다. 새 APK 설치·에뮬레이터 런타임·실차 주행·서명 검증은 하지 않았다. 이전 작업의 런타임 결과를 이번 변형 검증으로 대체하지 않는다.
+- 기존 Java 8 source/target·deprecated API 경고는 남아 있다. 커밋·푸시하지 않았다.
+
+검증 명령:
+
+```powershell
+.\scripts\test-state.ps1 -JdkHome 'C:\Program Files\Amazon Corretto\jdk21.0.10_7'
+.\scripts\verify-build-variants.ps1
+# 이미 컴파일한 결과만 검사할 때
+.\scripts\verify-build-variants.ps1 -SkipCompile
+```
+
+### 다음 작업
+
+실제 차량 상태 SDK로 정차·주행·상태 미확인을 판별하고 시연 조작 제한을 연결한다. 이 단계 전에는 submissionRelease의 모의 실행 잠금을 해제하지 않는다. 이후 사용자가 팀명과 키 관리 방법을 정한 뒤 서명 준비 검사·제출 산출물 생성·실제 설치 검증을 진행한다.

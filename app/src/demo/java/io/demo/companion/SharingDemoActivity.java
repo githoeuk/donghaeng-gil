@@ -16,7 +16,7 @@ import java.util.Date;
 import java.util.Locale;
 import static io.demo.companion.SharingModels.*;
 
-/** Parked-only debug screen. It does not read the real journey source. */
+/** Shared demo UI. Release is locked until a real parked-state provider is wired. */
 public final class SharingDemoActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SharingTransport transport;
@@ -30,6 +30,14 @@ public final class SharingDemoActivity extends Activity {
     };
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        if (!BuildConfig.DEBUG) {
+            LinearLayout locked = column(); locked.setPadding(28, 20, 28, 30);
+            locked.setBackgroundColor(Color.rgb(14, 24, 34));
+            locked.addView(text("모의 시연 잠김 · 정차 상태 확인 필요", 24));
+            locked.addView(text("차량 상태 연동이 준비되지 않아 실행할 수 없습니다. 가상의 정차 상태로 우회하지 않습니다.", 18));
+            locked.addView(button("내 차량 화면으로", this::finish));
+            setContentView(locked); return;
+        }
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root = column(); root.setPadding(28,20,28,30); scroll.addView(root);
         root.addView(text("동행길 · 모의 공유", 28));
@@ -59,14 +67,16 @@ public final class SharingDemoActivity extends Activity {
     }
     @Override protected void onStart() {
         super.onStart();
+        if (!BuildConfig.DEBUG) return;
         scenario = new MockSharingTransport(new MockSharingTransport.Clock() {
             public long elapsed() { return SystemClock.elapsedRealtime(); }
             public long wall() { return System.currentTimeMillis(); }
         });
+        renderedMessages = "initial";
         transport = scenario; transport.setListener(this::render); handler.post(ticker);
     }
     @Override protected void onStop() {
-        handler.removeCallbacksAndMessages(null); transport.close(); super.onStop();
+        handler.removeCallbacksAndMessages(null); if (transport != null) transport.close(); super.onStop();
     }
     private void render(Snapshot snapshot) {
         if (!snapshot.demo) throw new IllegalStateException("Demo screen accepts demo data only");

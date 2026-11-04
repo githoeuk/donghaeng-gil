@@ -1,10 +1,60 @@
 plugins { id 'com.android.application' }
+
 android {
- namespace 'io.demo.companion'
- buildFeatures { buildConfig true }
- compileSdk 35
- defaultConfig { applicationId 'io.demo.companion'; minSdk 28; targetSdk 34; versionCode 1; versionName '0.1' }
+    namespace 'io.demo.companion'
+    buildFeatures { buildConfig true }
+    compileSdk 35
+    defaultConfig {
+        applicationId 'io.demo.companion'
+        minSdk 28
+        targetSdk 34
+        versionCode 1
+        versionName '0.1'
+        buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'false'
+    }
+    flavorDimensions 'distribution'
+    productFlavors {
+        standard { dimension 'distribution' }
+        submission {
+            dimension 'distribution'
+            buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true'
+        }
+    }
+    buildTypes {
+        debug { buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true' }
+        release {
+            debuggable false
+            // Signing is deliberately not configured in this step.
+        }
+    }
+    sourceSets {
+        // Reuse only the demo feature, never the entire debug source set.
+        submission {
+            java.srcDir 'src/demo/java'
+            manifest.srcFile 'src/demo/AndroidManifest.xml'
+        }
+        standardDebug {
+            java.srcDir 'src/demo/java'
+            manifest.srcFile 'src/demo/AndroidManifest.xml'
+        }
+    }
 }
+
 dependencies {
- implementation 'ai.pleos.playground:NaviHelper:3.0.5'
+    implementation 'ai.pleos.playground:NaviHelper:3.0.5'
+}
+
+// Allow compile/manifest validation without producing unsigned distribution artifacts.
+// Replace this gate with validated Release signing/readiness checks in the signing task.
+def releaseDistributionGate = tasks.register('verifyReleaseDistributionConfigured') {
+    group = 'verification'
+    description = 'Blocks APK/AAB packaging until Release signing and submission safety are configured.'
+    doLast {
+        throw new GradleException('RELEASE_DISTRIBUTION_NOT_CONFIGURED: Release signing is deferred; APK/AAB packaging is disabled. Use compileStandardReleaseJavaWithJavac / compileSubmissionReleaseJavaWithJavac for configuration checks.')
+    }
+}
+tasks.configureEach {
+    if (name in ['packageStandardRelease', 'packageSubmissionRelease', 'bundleStandardRelease', 'bundleSubmissionRelease']) {
+        dependsOn releaseDistributionGate
+    }
 }

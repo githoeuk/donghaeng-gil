@@ -4,6 +4,10 @@
 
 여러 차량으로 이동하는 동행자들이 도착 예정 시간과 만날 장소를 공유하도록 돕는 Pleos Connect 차량용 앱 프로젝트입니다. 현대자동차그룹 차량용 앱 개발 공모전 출품을 위해 개발하고 있습니다.
 
+## 작업 전 참고
+
+[제출용 Release 가이드라인](docs/submission-release-guidelines.md)을 기능·빌드·권한·시연 작업의 기준으로 사용합니다. 제출용 모의 시연 포함과 서명 기준을 정리한 문서입니다. 빌드 변형 분리는 적용됐지만 정차 판별·서명 설정·제출 APK 생성은 아직 완료되지 않았습니다.
+
 ## 현재 구현 상태
 
 메인 화면은 **내 차량의 실제 위치와 Pleos 내비게이션의 목적지·남은 시간**을 표시합니다.
@@ -16,7 +20,7 @@
 - 위치 정확도가 100m보다 나쁘거나 최신 위치를 확인할 수 없어도 ETA에 확인이 필요하다고 표시합니다.
 - 화면을 벗어나면 위치 수신과 내비 조회를 중단합니다. 위치를 서버로 전송하거나 저장하지 않습니다.
 
-**현재는 내 차량 정보 연동과 Debug 전용 모의 공유 단계입니다.** 실제 동행 차량 간 통신, 그룹 생성·참여, 다른 차량의 위치 공유는 아직 구현하지 않았습니다.
+**현재는 내 차량 정보 연동과 모의 공유, 제출용 빌드 구성 분리 단계입니다.** 실제 동행 차량 간 통신, 그룹 생성·참여, 다른 차량의 위치 공유는 아직 구현하지 않았습니다.
 
 [메인 화면 연동 검증](docs/main-screen-integration.md) · [기존 SDK 검증](docs/pleos-location-eta-verification.md)
 
@@ -45,19 +49,19 @@ DB·자체 백엔드·별도 API 키 없이 실행합니다. Debug와 Release �
 4. Pleos Connect 에뮬레이터를 실행한 뒤 `app`을 실행합니다.
 
 ```powershell
-.\gradlew.bat assembleDebug
+.\gradlew.bat assembleStandardDebug
 ```
 
-macOS / Linux에서는 `sh ./gradlew assembleDebug`를 실행합니다.
+macOS / Linux에서는 `sh ./gradlew assembleStandardDebug`를 실행합니다.
 
-빌드 결과: `app/build/outputs/apk/debug/app-debug.apk`
+개발용 Debug 빌드 결과: `app/build/outputs/apk/standard/debug/app-standard-debug.apk`
 
 [설치용 Debug APK](artifacts/donghaeng-gil-demo-debug.apk)는 개발용 서명이며 정식 배포용 Release 빌드가 아닙니다.
 
 이 PC의 작업 경로는 `D:\projects\donghaeng-gil`입니다. 소스·Gradle 캐시·임시 파일을 D드라이브에서 사용하는 로컬 빌드 스크립트는 다음과 같습니다. 이 스크립트는 저장소 외부의 PC 전용 설정입니다.
 
 ```powershell
-& 'D:\projects\build-donghaeng.ps1' -Tasks @('assembleDebug','assembleRelease')
+& 'D:\projects\build-donghaeng.ps1' -Tasks @('assembleStandardDebug')
 ```
 
 ## 메인 화면 사용 방법
@@ -76,13 +80,39 @@ Debug 빌드의 **알림 시험** 버튼으로 기존 로컬 알림·PiP 데모�
 
 이전 알림 시험의 조건과 한계는 [Pleos 테스트 기록](docs/pleos-test-results.md)을 참고하세요.
 
-## 모의 공유 시연 (Debug 전용)
+## 모의 공유 시연과 빌드 변형
 
 메인 화면의 **모의 공유 (정차 중)**에서 데모 그룹 생성·코드 참여(`DEMO42`), 모의 차량 3대의 위치·ETA 갱신, 상황 메시지·확인 응답, 연결 끊김·오래된 데이터·공유 중지·그룹 나가기를 시험할 수 있습니다.
 
-**한 에뮬레이터 내부의 가상 시연입니다.** 공식 앱 연동이나 실제 차량 간 통신이 아니며, 실제 위치를 외부에 보내지 않습니다. 화면을 벗어나면 데모 상태를 삭제합니다. 모의 Activity·통신 구현은 Release에 포함되지 않습니다.
+**한 에뮬레이터 내부의 가상 시연입니다.** 공식 앱 연동이나 실제 차량 간 통신이 아니며, 실제 위치를 외부에 보내지 않습니다. 화면을 벗어나면 데모 상태를 삭제합니다. 모의 Activity·통신 구현은 standardRelease에는 없고 submissionRelease에는 포함됩니다. 제출용에서는 실제 정차 판별이 아직 없어 시연 진입·실행을 잠가 두었습니다. Debug의 명시적 안내 후 개발용 시연만 가능합니다.
 
 [통신 구조와 시연 방법](docs/communication-plan.md) · [최근 작업 결과](docs/work-log.md)
+
+| 변형 | 모의 코드 | SDK 진단·알림 시험 | 디버깅 |
+| --- | --- | --- | --- |
+| standardDebug | 포함, 개발용 실행 | 포함 | 허용 |
+| submissionDebug | 포함, 개발용 실행 | 포함 | 허용 |
+| standardRelease | 제외 | 제외 | 비허용 |
+| submissionRelease | 포함, 정차 판별 전 실행 잠김 | 제외 | 비허용 |
+
+모의 Activity는 모든 포함 변형에서 exported=false이며 DUMP 권한에 의존하지 않습니다. Release에는 Debug 소스셋 전체를 포함하지 않습니다. 모든 변형의 applicationId는 `io.demo.companion`으로 같으므로 동시에 설치하는 구성이 아닙니다.
+
+현재 **Release APK/AAB 패키징은 의도적으로 차단**되어 있습니다. 서명 설정과 제출 안전 기준을 연결하기 전에는 `assembleStandardRelease`, `assembleSubmissionRelease`, `assembleRelease`, `bundle*Release`로 unsigned 산출물을 만들지 않습니다. 서명 키나 제출 APK는 아직 없습니다. 구성만 검사하려면 다음을 실행합니다.
+
+```powershell
+# 네 변형의 컴파일·매니페스트 병합 후 구성 56개 검사. APK 생성 없음.
+.\scripts\verify-build-variants.ps1
+# 기존 생성 결과만 검사
+.\scripts\verify-build-variants.ps1 -SkipCompile
+```
+
+직접 컴파일할 때도 로컬 빌드 스크립트를 사용합니다.
+
+```powershell
+& 'D:\projects\build-donghaeng.ps1' -Tasks @('compileStandardReleaseJavaWithJavac','compileSubmissionReleaseJavaWithJavac')
+```
+
+로컬 빌드 스크립트의 기본값은 여전히 `assembleDebug`이며 두 Debug 변형을 모두 선택합니다. 개발 중에는 `-Tasks @('assembleStandardDebug')`처럼 변형을 명시하세요. 저장소의 기존 `artifacts/donghaeng-gil-demo-debug.apk`는 이전 검증용 파일이며 이번 구성 작업에서 갱신하지 않았습니다.
 
 ## 상태 처리 테스트
 

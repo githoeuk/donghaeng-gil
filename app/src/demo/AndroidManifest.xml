@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".SharingDemoActivity" android:exported="false" android:label="동행길 모의 공유" />
+    </application>
+</manifest>

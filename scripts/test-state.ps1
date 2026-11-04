@@ -14,7 +14,7 @@ try {
     New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
     $sourceRoot = 'app/src/main/java/io/demo/companion/'
     $sources = @('JourneyState','DestinationAddressResolver','NavigationSession','SharingModels','SharingStore','SharingTransport') | ForEach-Object { $sourceRoot + $_ + '.java' }
-    $sources += 'app/src/debug/java/io/demo/companion/MockSharingTransport.java'
+    $sources += 'app/src/demo/java/io/demo/companion/MockSharingTransport.java'
     $tests = @('JourneyStateTest','DestinationAddressResolverTest','NavigationSessionTest','SharingTest')
     $sources += $tests | Where-Object { $_ -ne 'SharingTest' } | ForEach-Object { 'app/src/test/java/io/demo/companion/' + $_ + '.java' }
     $sources += 'app/src/testDebug/java/io/demo/companion/SharingTest.java'

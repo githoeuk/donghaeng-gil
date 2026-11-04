@@ -2,6 +2,7 @@ package io.demo.companion;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -68,8 +69,10 @@ public class MainActivity extends Activity {
         note.setPadding(0, dp(18), 0, dp(8)); root.addView(note);
         LinearLayout actions = new LinearLayout(this);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
+        if (BuildConfig.HAS_SHARING_DEMO) {
+            actions.addView(button("모의 공유 (정차 중)", this::showDemoIntro));
+        }
         if (BuildConfig.DEBUG) {
-            actions.addView(button("모의 공유 (정차 중)", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity"))));
             actions.addView(button("알림 시험", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".NotificationDemoActivity"))));
         }
         root.addView(actions);
@@ -81,6 +84,19 @@ public class MainActivity extends Activity {
     }
     @Override protected void onStop() {
         handler.removeCallbacks(ticker); source.stop(); super.onStop();
+    }
+    private void showDemoIntro() {
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+                .setTitle("모의 공유 안내")
+                .setMessage("모든 동행 차량·주소·메시지는 가상이며 외부로 전송하지 않습니다. 공식 앱과 연동되지 않습니다."
+                        + (BuildConfig.DEBUG ? "\n개발용 정차 시험에서만 사용하세요. 실제 정차 판별은 아직 연결되지 않았습니다."
+                        : "\n정차 상태를 확인할 수 없어 시연 실행이 잠겨 있습니다. 차량 상태 연동 후 사용할 수 있습니다."))
+                .setNegativeButton("닫기", null);
+        if (BuildConfig.DEBUG) {
+            dialog.setPositiveButton("개발용 모의 시연", (ignored, which) -> startActivity(new Intent()
+                    .setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity")));
+        }
+        dialog.show();
     }
     private void requestLocation() {
         requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
