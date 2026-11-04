@@ -13,9 +13,9 @@ try {
     $outputPath = Join-Path $projectPath '.gradle\state-tests'
     New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
     $sourceRoot = 'app/src/main/java/io/demo/companion/'
-    $sources = @('JourneyState','DestinationAddressResolver','NavigationSession','SharingModels','SharingStore','SharingTransport') | ForEach-Object { $sourceRoot + $_ + '.java' }
+    $sources = @('JourneyState','DestinationAddressResolver','NavigationSession','SharingModels','SharingStore','SharingTransport','ParkingState') | ForEach-Object { $sourceRoot + $_ + '.java' }
     $sources += 'app/src/demo/java/io/demo/companion/MockSharingTransport.java'
-    $tests = @('JourneyStateTest','DestinationAddressResolverTest','NavigationSessionTest','SharingTest')
+    $tests = @('JourneyStateTest','DestinationAddressResolverTest','NavigationSessionTest','SharingTest','ParkingStateTest')
     $sources += $tests | Where-Object { $_ -ne 'SharingTest' } | ForEach-Object { 'app/src/test/java/io/demo/companion/' + $_ + '.java' }
     $sources += 'app/src/testDebug/java/io/demo/companion/SharingTest.java'
     & $javacPath -encoding UTF-8 -d $outputPath @sources

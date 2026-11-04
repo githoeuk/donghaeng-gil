@@ -22,7 +22,12 @@ import java.util.Date;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    private static final int LOCATION_REQUEST = 20;
+    private static final int LOCATION_REQUEST = 20, VEHICLE_REQUEST = 21;
+    private final ParkingState parking = new ParkingState();
+    private VehicleParkingSource parkingSource;
+    private TextView parkingLabel;
+    private Button demoButton, vehiclePermission;
+    private AlertDialog demoIntro;
     private final JourneyState state = new JourneyState();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PleosJourneySource source;
@@ -70,7 +75,9 @@ public class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
         if (BuildConfig.HAS_SHARING_DEMO) {
-            actions.addView(button("모의 공유 (정차 중)", this::showDemoIntro));
+            parkingLabel = text("차량 상태 확인 중 · 모의 시연 잠김", 16, Color.rgb(169, 190, 203)); root.addView(parkingLabel);
+            vehiclePermission = button("차량 상태 접근 허용", () -> requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, VEHICLE_REQUEST)); root.addView(vehiclePermission);
+            demoButton = button("모의 공유 (정차 중)", this::showDemoIntro); demoButton.setEnabled(false); actions.addView(demoButton);
         }
         if (BuildConfig.DEBUG) {
             actions.addView(button("알림 시험", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".NotificationDemoActivity"))));
@@ -78,32 +85,41 @@ public class MainActivity extends Activity {
         root.addView(actions);
         setContentView(scroll);
         source = new PleosJourneySource(this, state, this::render);
+        if (BuildConfig.HAS_SHARING_DEMO) parkingSource = new VehicleParkingSource(this, parking, this::renderParking);
     }
     @Override protected void onStart() {
-        super.onStart(); source.start(); handler.post(ticker);
+        super.onStart(); source.start(); if (parkingSource != null) parkingSource.start(); handler.post(ticker);
     }
     @Override protected void onStop() {
-        handler.removeCallbacks(ticker); source.stop(); super.onStop();
+        handler.removeCallbacks(ticker); source.stop(); if (parkingSource != null) parkingSource.stop();
+        if (demoIntro != null) demoIntro.dismiss(); super.onStop();
+    }
+    private void renderParking() {
+        if (demoButton == null) return;
+        boolean allowed = parking.allowed(SystemClock.elapsedRealtime());
+        demoButton.setEnabled(allowed);
+        parkingLabel.setText((allowed ? "모의 시연 가능 · " : "모의 시연 잠김 · ") + parking.description(SystemClock.elapsedRealtime()));
+        vehiclePermission.setVisibility(parkingSource.hasPermission() ? View.GONE : View.VISIBLE);
+        if (!allowed && demoIntro != null && demoIntro.isShowing()) demoIntro.dismiss();
     }
     private void showDemoIntro() {
-        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
-                .setTitle("모의 공유 안내")
-                .setMessage("모든 동행 차량·주소·메시지는 가상이며 외부로 전송하지 않습니다. 공식 앱과 연동되지 않습니다."
-                        + (BuildConfig.DEBUG ? "\n개발용 정차 시험에서만 사용하세요. 실제 정차 판별은 아직 연결되지 않았습니다."
-                        : "\n정차 상태를 확인할 수 없어 시연 실행이 잠겨 있습니다. 차량 상태 연동 후 사용할 수 있습니다."))
-                .setNegativeButton("닫기", null);
-        if (BuildConfig.DEBUG) {
-            dialog.setPositiveButton("개발용 모의 시연", (ignored, which) -> startActivity(new Intent()
-                    .setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity")));
-        }
-        dialog.show();
-    }
-    private void requestLocation() {
+        if (!parking.allowed(SystemClock.elapsedRealtime())) { renderParking(); return; }
+        demoIntro = new AlertDialog.Builder(this).setTitle("모의 공유 안내")
+                .setMessage("모든 동행 차량·주소·메시지는 가상이며 외부로 전송하지 않습니다. 공식 앱과 연동되지 않습니다.\n정차 상태에서만 실행되며 주행·상태 미수신 시 시연과 그룹 정보가 삭제됩니다.")
+                .setNegativeButton("닫기", null)
+                .setPositiveButton("모의 시연 시작", (ignored, which) -> {
+                    if (parking.allowed(SystemClock.elapsedRealtime())) startActivity(new Intent()
+                            .setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity"));
+                    else renderParking();
+                }).create();
+        demoIntro.show();
+    }    private void requestLocation() {
         requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
     }
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == LOCATION_REQUEST) { source.refreshLocation(); render(); }
+        if (requestCode == VEHICLE_REQUEST && parkingSource != null) { parkingSource.stop(); parkingSource.start(); }
     }
     private void render() {
         if (connection == null) return;

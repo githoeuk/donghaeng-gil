@@ -6,7 +6,7 @@
 
 ## 작업 전 참고
 
-[제출용 Release 가이드라인](docs/submission-release-guidelines.md)을 기능·빌드·권한·시연 작업의 기준으로 사용합니다. 제출용 모의 시연 포함과 서명 기준을 정리한 문서입니다. 빌드 변형 분리는 적용됐지만 정차 판별·서명 설정·제출 APK 생성은 아직 완료되지 않았습니다.
+[제출용 Release 가이드라인](docs/submission-release-guidelines.md)을 기능·빌드·권한·시연 작업의 기준으로 사용합니다. 제출용 모의 시연 포함과 서명 기준을 정리한 문서입니다. 빌드 변형 분리와 실제 정차·주행 게이트는 적용됐지만 서명 설정·제출 APK 생성과 Release 런타임 검증은 아직 완료되지 않았습니다.
 
 ## 현재 구현 상태
 
@@ -84,23 +84,23 @@ Debug 빌드의 **알림 시험** 버튼으로 기존 로컬 알림·PiP 데모�
 
 메인 화면의 **모의 공유 (정차 중)**에서 데모 그룹 생성·코드 참여(`DEMO42`), 모의 차량 3대의 위치·ETA 갱신, 상황 메시지·확인 응답, 연결 끊김·오래된 데이터·공유 중지·그룹 나가기를 시험할 수 있습니다.
 
-**한 에뮬레이터 내부의 가상 시연입니다.** 공식 앱 연동이나 실제 차량 간 통신이 아니며, 실제 위치를 외부에 보내지 않습니다. 화면을 벗어나면 데모 상태를 삭제합니다. 모의 Activity·통신 구현은 standardRelease에는 없고 submissionRelease에는 포함됩니다. 제출용에서는 실제 정차 판별이 아직 없어 시연 진입·실행을 잠가 두었습니다. Debug의 명시적 안내 후 개발용 시연만 가능합니다.
+**한 에뮬레이터 내부의 가상 시연입니다.** 공식 앱 연동이나 실제 차량 간 통신이 아니며, 실제 위치를 외부에 보내지 않습니다. 화면을 벗어나면 데모 상태를 삭제합니다. 모의 Activity·통신 구현은 standardRelease에는 없고 submissionRelease에는 포함됩니다. Debug와 제출용 모두 실제 차량 속도 0·기어 P·플랫폼 UX 제한 없음이 확인될 때만 시연을 시작합니다. 권한·상태가 없거나 주행·갱신 지연이면 전체 시연을 중단하고 잠급니다. 정차 복귀 후에는 새 세션을 명시적으로 시작해야 합니다. [정차 판별 기준과 검증](docs/parking-safety.md)을 참고하세요.
 
 [통신 구조와 시연 방법](docs/communication-plan.md) · [최근 작업 결과](docs/work-log.md)
 
 | 변형 | 모의 코드 | SDK 진단·알림 시험 | 디버깅 |
 | --- | --- | --- | --- |
-| standardDebug | 포함, 개발용 실행 | 포함 | 허용 |
-| submissionDebug | 포함, 개발용 실행 | 포함 | 허용 |
+| standardDebug | 포함, 실제 정차 때만 실행 | 포함 | 허용 |
+| submissionDebug | 포함, 실제 정차 때만 실행 | 포함 | 허용 |
 | standardRelease | 제외 | 제외 | 비허용 |
-| submissionRelease | 포함, 정차 판별 전 실행 잠김 | 제외 | 비허용 |
+| submissionRelease | 포함, 실제 정차 때만 실행 | 제외 | 비허용 |
 
 모의 Activity는 모든 포함 변형에서 exported=false이며 DUMP 권한에 의존하지 않습니다. Release에는 Debug 소스셋 전체를 포함하지 않습니다. 모든 변형의 applicationId는 `io.demo.companion`으로 같으므로 동시에 설치하는 구성이 아닙니다.
 
 현재 **Release APK/AAB 패키징은 의도적으로 차단**되어 있습니다. 서명 설정과 제출 안전 기준을 연결하기 전에는 `assembleStandardRelease`, `assembleSubmissionRelease`, `assembleRelease`, `bundle*Release`로 unsigned 산출물을 만들지 않습니다. 서명 키나 제출 APK는 아직 없습니다. 구성만 검사하려면 다음을 실행합니다.
 
 ```powershell
-# 네 변형의 컴파일·매니페스트 병합 후 구성 56개 검사. APK 생성 없음.
+# 네 변형의 컴파일·매니페스트 병합 후 구성 72개 검사. APK 생성 없음.
 .\scripts\verify-build-variants.ps1
 # 기존 생성 결과만 검사
 .\scripts\verify-build-variants.ps1 -SkipCompile
@@ -123,7 +123,7 @@ Android 기기 없이 실행 가능한 Java 상태 검증입니다.
 # JAVA_HOME 또는 PATH가 없다면 설치된 JDK를 -JdkHome으로 지정
 ```
 
-기존 상태 25개·주소 매칭 11개에 내비 연결 수명 15개와 모의 공유 40개를 더해 총 91개 조건을 확인합니다. 독립 실행 Java 검사이며 Android 에뮬레이터 없이 실행할 수 있습니다.
+기존 상태 25개·주소 매칭 11개·내비 연결 수명 15개·모의 공유 40개·정차 안전 36개로 총 127개 조건을 확인합니다. 독립 실행 Java 검사이며 Android 에뮬레이터 없이 실행할 수 있습니다.
 
 ## 다음 개발 범위
 

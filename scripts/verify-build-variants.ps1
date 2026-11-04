@@ -46,6 +46,11 @@ try {
             $permissions = @($manifest.SelectNodes('/manifest/uses-permission') | ForEach-Object { $_.GetAttribute('name',$androidNamespace) })
             Assert-Variant (-not ($permissions -contains 'android.permission.INTERNET')) "$variant added network permission"
             Assert-Variant (($permissions -contains 'pleos.car.permission.NAVI_ROUTE_SEARCH') -eq $expectedDebug) "$variant test route permission mismatch"
+            Assert-Variant (($permissions -contains 'android.car.permission.CAR_SPEED') -eq $expectedDemo) "$variant vehicle speed permission mismatch"
+            Assert-Variant (($permissions -contains 'android.car.permission.CAR_POWERTRAIN') -eq $expectedDemo) "$variant gear permission mismatch"
+            $library = @($application.SelectNodes('uses-library') | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'android.car' })
+            Assert-Variant ($library.Count -eq 1 -and $library[0].GetAttribute('required',$androidNamespace) -eq 'false') "$variant car runtime library declaration mismatch"
+            Assert-Variant (Test-Path -LiteralPath "$classes/VehicleParkingSource.class") "$variant missing real vehicle safety source"
             $config = Get-Content -Raw -LiteralPath $configFile
             $flag = $expectedDemo.ToString().ToLowerInvariant()
             Assert-Variant ($config -match "HAS_SHARING_DEMO = $flag;") "$variant demo BuildConfig flag mismatch"

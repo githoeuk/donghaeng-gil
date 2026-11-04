@@ -4,6 +4,7 @@ android {
     namespace 'io.demo.companion'
     buildFeatures { buildConfig true }
     compileSdk 35
+    useLibrary 'android.car'
     defaultConfig {
         applicationId 'io.demo.companion'
         minSdk 28

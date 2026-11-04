@@ -16,7 +16,7 @@ SharingDemoActivity → SharingTransport ← 향후 실제 통신 어댑터
                 SharingStore / SharingModels
 ```
 
-화면은 SharingTransport의 Snapshot을 표시하고 그룹 참여·공유·메시지 명령을 호출한다. Debug의 연결 끊김·갱신 중단 버튼만 모의 시나리오 구현을 호출한다. 공식 연동 어댑터는 아직 만들지 않았다. standardRelease에는 모의 Activity·통신 구현이 없고 submissionRelease에는 포함된다. 실제 정차 판별이 연결되기 전에는 제출용의 진입과 실행을 차단하며, Debug에서만 개발용 모의 시연을 실행한다. 두 Release의 SDK 진단·알림 시험 도구는 제외된다.
+화면은 SharingTransport의 Snapshot을 표시하고 그룹 참여·공유·메시지 명령을 호출한다. Debug의 연결 끊김·갱신 중단 버튼만 모의 시나리오 구현을 호출한다. 공식 연동 어댑터는 아직 만들지 않았다. standardRelease에는 모의 Activity·통신 구현이 없고 submissionRelease에는 포함된다. Debug와 제출용 모두 AAOS 실제 속도·기어·UX 정차 조건에서만 실행하며, 상태 미수신·주행·오래됨에는 종료·잠근다. Release 런타임 검증은 아직 없다. 두 Release의 SDK 진단·알림 시험 도구는 제외된다.
 
 기존 내비 수집 코드는 모의 공유와 연결하지 않았다. 모의 화면을 열면 MainActivity의 수집이 중단되며 데모 차량은 모두 가상이다. 실제 송신 어댑터를 도입할 때 수집·공유 수명주기를 별도로 설계해야 한다.
 
@@ -71,9 +71,12 @@ SharingDemoActivity → SharingTransport ← 향후 실제 통신 어댑터
 .\scripts\verify-build-variants.ps1
 ```
 
-독립 실행 Java 검사는 기존 36개, 내비 연결 수명 15개, 공유 상태·모의 통신 40개로 총 91개다. src/demo의 모의 구현을 검사하는 SharingTest는 testDebug 소스셋에 있다. 로컬 화면 증거는 `.gradle/sharing-active.png`, `.gradle/sharing-message.png`에 있다.
+독립 실행 Java 검사는 상태·주소 36개, 내비 연결 수명 15개, 공유 40개, 정차 안전 36개로 총 127개다. src/demo의 모의 구현을 검사하는 SharingTest는 testDebug 소스셋에 있다. 로컬 화면 증거는 `.gradle/sharing-active.png`, `.gradle/sharing-message.png`에 있다.
 
 
 ## 제출 빌드 구성 후속 변경
 
-모의 UI·엔진과 Activity 선언은 src/demo로 이동했다. standardDebug와 submissionDebug에서는 모의 기능·Debug 진단을 포함하며, submissionRelease는 모의 기능만 포함한다. Activity는 exported=false로 앱 내부에서만 진입한다. Release의 실제 정차 판별과 서명은 후속 작업이며 패키징을 차단한다. 현재 기준은 [제출 가이드라인](submission-release-guidelines.md)을 따른다.
+모의 UI·엔진과 Activity 선언은 src/demo로 이동했다. standardDebug와 submissionDebug에서는 모의 기능·Debug 진단을 포함하며, submissionRelease는 모의 기능만 포함한다. Activity는 exported=false로 앱 내부에서만 진입한다. 실제 정차 판별은 연결됐지만 서명·제출 APK 생성은 계속 차단한다. 현재 기준은 [제출 가이드라인](submission-release-guidelines.md)을 따른다.
+
+
+모의 화면은 실제 속도·기어·UX 상태를 안전 판별에만 사용한다. 모의 공유 데이터로 실제 차량 신호를 전송하지 않는다. 조건·권한·검증 범위는 [정차 안전 문서](parking-safety.md)를 따른다. 독립 Java 검사는 정차 안전 36개를 더해 127개이며 변형 구성 검사는 72개다.

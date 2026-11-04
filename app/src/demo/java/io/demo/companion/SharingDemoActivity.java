@@ -16,8 +16,11 @@ import java.util.Date;
 import java.util.Locale;
 import static io.demo.companion.SharingModels.*;
 
-/** Shared demo UI. Release is locked until a real parked-state provider is wired. */
+/** Read-only real vehicle safety state gates a separate fictional sharing scenario. */
 public final class SharingDemoActivity extends Activity {
+    private final ParkingState parking = new ParkingState();
+    private VehicleParkingSource parkingSource;
+    private String lockedReason;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SharingTransport transport;
     private MockSharingTransport scenario;
@@ -26,59 +29,98 @@ public final class SharingDemoActivity extends Activity {
     private EditText invite;
     private String renderedMessages = "initial";
     private final Runnable ticker = new Runnable() {
-        @Override public void run() { scenario.tick(); handler.postDelayed(this, 1000); }
+        @Override public void run() {
+            if (!parking.allowed(SystemClock.elapsedRealtime())) { renderSafety(); return; }
+            scenario.tick(); handler.postDelayed(this, 1000);
+        }
     };
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        if (!BuildConfig.DEBUG) {
-            LinearLayout locked = column(); locked.setPadding(28, 20, 28, 30);
-            locked.setBackgroundColor(Color.rgb(14, 24, 34));
-            locked.addView(text("모의 시연 잠김 · 정차 상태 확인 필요", 24));
-            locked.addView(text("차량 상태 연동이 준비되지 않아 실행할 수 없습니다. 가상의 정차 상태로 우회하지 않습니다.", 18));
-            locked.addView(button("내 차량 화면으로", this::finish));
-            setContentView(locked); return;
-        }
+        parkingSource = new VehicleParkingSource(this, parking, this::renderSafety);
+        renderSafety();
+    }
+    private void buildDemoUi() {
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root = column(); root.setPadding(28,20,28,30); scroll.addView(root);
         root.addView(text("동행길 · 모의 공유", 28));
         root.addView(text("정차 중 시험용 · 공식 앱 미연동 · 실제 네트워크 통신 없음\n모든 차량·주소·메시지는 가상입니다. 실제 내 차량 정보는 메인 화면에서 확인하세요.", 16));
         status = text("", 17); root.addView(status);
         LinearLayout groupActions = row(); root.addView(groupActions);
-        groupActions.addView(button("데모 그룹 만들기", () -> transport.createGroup()));
+        groupActions.addView(demoButton("데모 그룹 만들기", () -> transport.createGroup()));
         invite = new EditText(this); invite.setSingleLine(true); invite.setText("DEMO42"); invite.setTextColor(Color.WHITE);
         invite.setContentDescription("데모 초대 코드"); groupActions.addView(invite, new LinearLayout.LayoutParams(200,-2));
-        groupActions.addView(button("코드로 데모 참여", () -> transport.joinGroup(invite.getText().toString())));
+        groupActions.addView(demoButton("코드로 데모 참여", () -> transport.joinGroup(invite.getText().toString())));
         LinearLayout sharingActions = row(); root.addView(sharingActions);
-        sharingActions.addView(button("공유 시작", () -> transport.startSharing()));
-        sharingActions.addView(button("공유 중지", () -> transport.stopSharing()));
-        sharingActions.addView(button("그룹 나가기", () -> transport.leaveGroup()));
+        sharingActions.addView(demoButton("공유 시작", () -> transport.startSharing()));
+        sharingActions.addView(demoButton("공유 중지", () -> transport.stopSharing()));
+        sharingActions.addView(demoButton("그룹 나가기", () -> transport.leaveGroup()));
         root.addView(text("모의 동행 차량 · 장소 ID가 같은 차량끼리만 ETA 비교", 18));
         vehicles = text("",18); root.addView(vehicles);
         LinearLayout networkActions = row(); root.addView(networkActions);
-        networkActions.addView(button("연결 끊김 시험", () -> scenario.disconnect()));
-        networkActions.addView(button("갱신 중단 시험", () -> scenario.freeze()));
-        networkActions.addView(button("모의 재연결", () -> scenario.reconnect()));
+        networkActions.addView(demoButton("연결 끊김 시험", () -> scenario.disconnect()));
+        networkActions.addView(demoButton("갱신 중단 시험", () -> scenario.freeze()));
+        networkActions.addView(demoButton("모의 재연결", () -> scenario.reconnect()));
         root.addView(text("상황 메시지 · 전달·확인 모두 모의 결과",18));
         LinearLayout messageActions = row(); root.addView(messageActions);
-        for (MessageKind kind : MessageKind.values()) messageActions.addView(button(kind.label, () -> transport.send(kind)));
+        for (MessageKind kind : MessageKind.values()) messageActions.addView(demoButton(kind.label, () -> transport.send(kind)));
         messages = column(); root.addView(messages);
         root.addView(button("내 차량 화면으로", this::finish));
         setContentView(scroll);
     }
     @Override protected void onStart() {
-        super.onStart();
-        if (!BuildConfig.DEBUG) return;
+        super.onStart(); parkingSource.start();
+    }
+    @Override protected void onStop() {
+        parkingSource.stop(); stopDemo(); super.onStop();
+    }
+    @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code == 21) { parkingSource.stop(); parkingSource.start(); }
+    }
+    private void stopDemo() {
+        handler.removeCallbacksAndMessages(null);
+        if (transport != null) {
+            if (getCurrentFocus() != null) getCurrentFocus().clearFocus();
+            android.view.inputmethod.InputMethodManager input = getSystemService(android.view.inputmethod.InputMethodManager.class);
+            if (input != null) input.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(), 0);
+            transport.close();
+        }
+        transport = null; scenario = null; renderedMessages = "initial";
+    }
+    private void startDemo() {
+        if (transport != null) return;
+        if (!parking.allowed(SystemClock.elapsedRealtime())) { renderSafety(); return; }
+        buildDemoUi(); lockedReason = null;
         scenario = new MockSharingTransport(new MockSharingTransport.Clock() {
             public long elapsed() { return SystemClock.elapsedRealtime(); }
             public long wall() { return System.currentTimeMillis(); }
         });
-        renderedMessages = "initial";
         transport = scenario; transport.setListener(this::render); handler.post(ticker);
     }
-    @Override protected void onStop() {
-        handler.removeCallbacksAndMessages(null); if (transport != null) transport.close(); super.onStop();
+    private void renderSafety() {
+        boolean allowed = parking.allowed(SystemClock.elapsedRealtime());
+        if (allowed && transport != null) return;
+        if (!allowed) stopDemo();
+        String reason = parking.description(SystemClock.elapsedRealtime());
+        String key = allowed + ":" + reason + ":" + parkingSource.hasPermission();
+        if (key.equals(lockedReason)) return;
+        lockedReason = key;
+        LinearLayout locked = column(); locked.setPadding(28, 20, 28, 30);
+        locked.setBackgroundColor(Color.rgb(14, 24, 34));
+        locked.addView(text(allowed ? "정차 확인 · 모의 시연 가능" : "모의 시연 잠김", 24));
+        locked.addView(text(reason, 18));
+        locked.addView(text("P·속도 0·플랫폼 제한 없음일 때만 실행합니다. 주행·상태 미수신 시 그룹과 메시지를 삭제하며 자동 재개하지 않습니다.", 17));
+        Button start = button("새 모의 시연 시작", this::startDemo); start.setEnabled(allowed); locked.addView(start);
+        if (!parkingSource.hasPermission()) locked.addView(button("차량 상태 접근 허용", () ->
+                requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, 21)));
+        locked.addView(button("내 차량 화면으로", this::finish)); setContentView(locked);
     }
-    private void render(Snapshot snapshot) {
+    private Button demoButton(String label, Runnable action) {
+        return button(label, () -> {
+            if (!parking.allowed(SystemClock.elapsedRealtime())) { renderSafety(); return; }
+            action.run();
+        });
+    }    private void render(Snapshot snapshot) {
         if (!snapshot.demo) throw new IllegalStateException("Demo screen accepts demo data only");
         status.setText((snapshot.groupId.isEmpty() ? "그룹 미참여" : "데모 그룹 · 초대 코드 " + snapshot.inviteCode)
                 + " · " + (snapshot.connection == Connection.CONNECTED ? "모의 연결됨" : "모의 연결 끊김")
@@ -114,7 +156,7 @@ public final class SharingDemoActivity extends Activity {
             }
             messages.addView(text(message.sender + " · " + message.kind.label + " · " + delivery,16));
             if (!message.sender.equals("나 (모의)") && message.delivery == Delivery.DELIVERED)
-                messages.addView(button("모의 응답 확인", () -> transport.acknowledge(message.id)));
+                messages.addView(demoButton("모의 응답 확인", () -> transport.acknowledge(message.id)));
         }
     }
     private LinearLayout column() { LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); return layout; }
