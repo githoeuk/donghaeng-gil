@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application>
+        <activity android:name=".NotificationDemoActivity" android:exported="false" android:resizeableActivity="true" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"><meta-data android:name="distractionOptimized" android:value="true" /></activity>
         <activity android:name=".PleosDiagnosticsActivity" android:exported="true"
             android:permission="android.permission.DUMP" android:label="동행길 SDK 진단">
             <meta-data android:name="distractionOptimized" android:value="true" />
