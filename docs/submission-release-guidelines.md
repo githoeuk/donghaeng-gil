@@ -52,7 +52,7 @@
 
 ## 4. 빌드 구성 기준과 적용 상태
 
-standard/submission flavor와 debug/release build type을 적용했다. `src/demo`에는 모의 UI·엔진·비공개 Activity 선언만 두고, Debug와 submissionRelease에서만 공유한다. 네 변형의 컴파일·매니페스트와 88개 구성 검사를 통과했다. **실제 그룹 설정의 속도·기어·UX 상태 게이트는 모든 변형에 적용한다. 모의 시연 게이트는 모의 기능이 있는 Debug와 submissionRelease에 공통 적용했다. 서명된 APK나 Release 런타임 시험은 아직 없다.**
+standard/submission flavor와 debug/release build type을 적용했다. `src/demo`에는 모의 UI·엔진·비공개 Activity 선언만 두고, Debug와 submissionRelease에서만 공유한다. 네 변형의 컴파일·매니페스트와 104개 구성 검사를 통과했다. **실제 그룹 설정의 속도·기어·UX 상태 게이트는 모든 변형에 적용한다. 모의 시연 게이트는 모의 기능이 있는 Debug와 submissionRelease에 공통 적용했다. 서명된 APK나 Release 런타임 시험은 아직 없다.**
 
 - 제출 변형은 `submissionRelease`로 구성한다. Release build type을 사용하고 debuggable=false로 설정한다.
 - 일반 실행용 `standardRelease`는 모의 시연 진입점·모의 구현을 포함하지 않는다. 제출용과 일반용 차이는 빌드 시 결정한다.
@@ -102,7 +102,7 @@ standard/submission flavor와 debug/release build type을 적용했다. `src/dem
 - [ ] 영상과 기획서에 실제/모의/향후 기능을 일관되게 설명
 - [ ] Git에 키·로컬 설정·개인정보가 없는지 확인
 
-사용자의 실제 중계 구현 요청에 따라 INTERNET 권한과 별도 실제 공유 화면을 추가했다. 명시적 동의 후 좌표·주소·목적지·ETA를 전송하고 화면 이탈 시 종료한다. Debug는 지정된 로컬 호스트 HTTP만, Release는 HTTPS만 허용한다. 실제 그룹 화면의 정차 설정·메시지 조작 게이트를 위해 CAR_SPEED/CAR_POWERTRAIN을 모든 변형에서 사용한다. 임시 인증·그룹 격리·보관 제한과 온라인 이전 한계는 [실제 중계 문서](local-relay.md)를 따른다.
+사용자의 실제 중계 구현 요청에 따라 INTERNET 권한과 별도 실제 공유 화면을 추가했다. 명시적 동의 후 좌표·주소·목적지·ETA를 location Foreground Service로 전송하며 다른 앱에서도 유지한다. 지속 알림의 중지, 탈퇴·권한/설정 해제·작업 종료 시 중지하며 자동 재시작하지 않는다. [백그라운드 공유 기준](background-sharing.md)을 따른다. Debug는 지정된 로컬 호스트 HTTP만, Release는 HTTPS만 허용한다. 실제 그룹 화면의 정차 설정·메시지 조작 게이트를 위해 CAR_SPEED/CAR_POWERTRAIN을 모든 변형에서 사용한다. 임시 인증·그룹 격리·보관 제한과 온라인 이전 한계는 [실제 중계 문서](local-relay.md)를 따른다.
 
 ## 8. 적용 순서와 변경 관리
 

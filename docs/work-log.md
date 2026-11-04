@@ -249,3 +249,48 @@ Pleos_Connect_v2.1.0 두 독립 인스턴스(emulator-5554/5556, Android14/API34
 ## 2026-11-04 — 실제 중계 작업 커밋 분리
 
 후속 사용자 요청으로 서버, 앱 연동, 문서의 세 작업으로 커밋을 나눴다. 688571a는 Node 메모리 중계·HTTP 통합 검사·Dockerfile, 793424f는 실제 앱 통신·공유 UI·네트워크 정책·송신 모델·검사 스크립트다. 문서 커밋에는 실행/온라인 이전 안내, 제출 범위와 이번 검증 기록을 포함한다. 서버 통합 검사와 diff 검사를 다시 통과했다. 코드 기능은 추가 수정하지 않았고 이전 빌드·에뮬레이터 검증 결과를 유지한다. 데이터는 H2나 파일 DB가 아닌 서버 프로세스 RAM의 Map에 임시 보관한다. 원격 푸시는 하지 않았다.
+
+## 2026-11-04 — 내비 전환 후 위치·ETA 백그라운드 공유
+
+사용자 요청: Pleos 백그라운드 실행 조건을 확인하고 내비 화면에서도 실제 공유를 유지한다. 이번 변경은 커밋·푸시하지 않는다.
+
+### 플랫폼 확인과 결정
+
+Pleos 공식 앱 구조/동작 모델은 화면 이탈과 앱 종료를 구분하며 통신처럼 지속해야 하는 작업의 실행·중단 정책과 리소스 절약을 설계하도록 안내한다. Android 공식 문서는 위치 공유를 location FGS 용도로 설명하며, 화면에서 사용자 동작으로 시작하고 위치 권한/설정·유형별 권한·지속 알림을 적용하도록 한다. Pleos FusedLocation 문서도 Android 백그라운드 위치 접근을 별도로 보장하지 않는다. 따라서 기존 LocationManager/NaviHelper를 유지하고 화면에서 시작한 location Foreground Service로만 지속한다. 무조건적인 상주·실차 승인·시동 종료 이후 실행을 확인한 것은 아니다. 출처와 조건은 docs/background-sharing.md에 링크했다.
+
+### 구현
+
+- SharingService가 실제 JourneyState/PleosJourneySource/HttpSharingTransport와 메모리 동의를 소유한다. Activity는 바인딩해 같은 세션을 표시하고 화면 이탈 때 UI 타이머·차량 조작 판별·바인딩만 정리한다. 공유 전 바인딩 단계에는 위치 수집이나 FGS를 시작하지 않는다.
+- 공유 동의는 다른 앱에서도 위치·목적지·ETA를 전송하며 지속 알림에서 중지할 수 있음을 안내한다. Android13+ 알림 권한은 화면에서 요청하며 권한 허용 뒤에도 공유 시작을 다시 눌러야 한다. 위치/알림 설정·그룹 연결·정차를 재확인한다. foregroundServiceType=location, FOREGROUND_SERVICE/FOREGROUND_SERVICE_LOCATION을 모든 변형에 추가했다. Service는 exported=false다. ACCESS_BACKGROUND_LOCATION·부팅 수신기·절전 예외·WakeLock은 추가하지 않았다.
+- 세대별 SharingLifetime이 중복·이전·지연·취소 후 시작을 거절한다. 서비스는 즉시 FGS 알림을 올린 다음 SDK 수집·서버 공유를 시작한다. 지속 알림 ID301/전용 채널은 무음·낮은 중요도로 위치/주소를 표시하지 않고 공유 중지 액션을 제공한다.
+- 화면 밖에서는 서버 폴링을 약 1초에서 5초로 낮추고 위치·ETA 송신은 약 5초로 유지한다. 모의 데이터와 섞지 않으며 원본 신선도·위치 불일치·목적지 취소 방어는 유지한다. 백그라운드 메시지는 앱 수신만 확인하고 사용자 확인은 정차 UI에서 별도로 누른다.
+- 중지/탈퇴/위치·알림 설정 해제 시 수집·업로드·알림을 종료한다. 화면이 없으면 연결도 닫아 그룹에서 빠진다. 시작 응답 10초/연결 오류 60초/동의 수명 2시간 한도를 둔다. START_NOT_STICKY/stopWithTask=true로 작업 종료·프로세스 재생성 뒤 자동 공유를 하지 않는다. 프로세스 강제 종료 시 탈퇴 요청 완료는 보장할 수 없어 서버 TTL을 사용한다.
+- 화면 복귀 시 같은 서버·이름·그룹·공유 상태를 다시 표시한다. 종료된 서비스에 재진입했을 때 이전 차량/메시지가 남지 않도록 비운다. 실제 SDK reader의 설명을 수명 소유자 기준으로 수정했다. 기존 모의 화면의 이탈 시 종료 정책과 Release 패키징 차단은 유지한다.
+
+### 자동 검증
+
+- build-donghaeng.ps1: assembleStandardDebug 및 네 변형 Java 컴파일 성공. 중간에 Activity의 이전 SDK 초기화 참조가 남아 컴파일 실패한 것을 제거했으며 최종 빌드는 성공했다. 기존 JDK21/Java8 대상·Gradle9 호환 경고와 Notification API deprecated 경고는 남는다.
+- scripts/test-state.ps1: 기존 146개 + SharingLifetimeTest 32개 = 178개 통과. 화면/정차/권한/그룹 조건, 이중 시작, 이전 세대·중지 후 시작, 지연, 시작 제한·2시간 만료, 새 객체의 비공유 초기 상태를 검사했다.
+- scripts/verify-build-variants.ps1: 104개 통과. 네 변형 location 서비스 구현·비공개 선언·stopWithTask·FGS 권한과 always-on 위치 권한 부재, 기존 실제/모의/진단 포함 범위·네트워크 정책을 확인했다. 서명 키·제출 APK/AAB는 만들지 않았다. Debug 검증 APK만 설치했다.
+
+### Pleos 에뮬레이터 검증
+
+Pleos Connect v2.1.0, Android14/API34, emulator-5554/user10에서 실행했다. 로컬 Node 중계와 별도 HTTP 수신 클라이언트 BackgroundReceiver를 사용했다. 이번 검증의 수신자는 두 번째 Android 에뮬레이터가 아니라 실제 API를 호출하는 독립 클라이언트다. 이전 작업의 두 에뮬레이터 화면 공유 검증과 구분한다. 위치·차량·알림 권한을 허용한 상태로 실제 그룹을 만들고 명시적으로 공유를 시작했다.
+
+1. 서비스 상태에서 isForeground=true, notification301, 유형 0x8(location), startRequested=true를 확인했다(.gradle/bg-service.txt). 공유 전 수신 위치는 null이었다.
+2. 내비 앱으로 이동한 뒤 Group/Main/진단 Activity의 비표시·STOPPED 상태를 dumpsys로 확인했다(.gradle/bg-hidden-activities.txt). 멀티윈도우의 topResumedActivity 요약에는 이전 값이 남는 경우가 있어 해당 Activity의 실제 state·mVisible=false를 기준으로 확인했다. 앱 화면이 계속 보이는 분할 실행만으로 성공 처리하지 않았다.
+3. 내비 화면에서 AVD GPS를 약 37.412720/127.094680 → 37.412798/127.094800 → 37.412900/127.094898로 변경하자 독립 수신자에게 새 좌표가 전달됐다. 내비에는 Debug 진단 목적지 37.4200/127.1000을 요청했고 Pleos SDK가 제공한 약 9~10분·1.8km를 실제 HTTP로 수신했다. 시험 좌표와 에뮬레이터 SDK ETA이며 실차 위치·교통 정확도 결과가 아니다.
+4. 첫 세션 수신은 약 276초 동안 관측됐고 순서 번호 1→55가 진행됐다(중간 UI 복귀 포함). ETA가 유효한 수신 46건의 원본 나이 최대는 약 11초로 15초 신선도 기준 안이었다. 내비로 이동한 뒤에도 수 분 동안 새 위치·ETA가 이어졌다. 원본 로그는 .gradle/bg-peer-evidence.jsonl, 집계는 bg-summary.json, 화면은 bg-navigation.png다. 토큰은 수신 프로세스 메모리에만 두고 이 증거 파일에 기록하지 않았다.
+5. 독립 수신자의 상황 메시지가 앱 수신(DELIVERED)으로 확인됐고, 화면 복귀 시 메시지 확인 버튼과 같은 초대 코드·차량 이름·공유 상태가 보였다(.gradle/bg-returned-group.png). 새 그룹·새 동의로 바뀌지 않았다. 알림 본문 탭의 화면 복귀 동작은 확정 검증하지 않았으며 앱의 일반 진입으로 복귀를 확인했다.
+6. 내비로 다시 이동 후 Pleos 알림 센터의 '동행길 · 위치 공유 중'과 실제 '공유 중지' 액션을 확인·눌렀다(.gradle/bg-notification-panel.xml/png, bg-before-notification-stop.xml). 서비스가 (nothing)으로 사라지고 수신 데이터도 null이 됐다(.gradle/bg-stopped-service.txt). 화면이 없어도 사용자 중지가 동작했다.
+7. 최종 Debug를 다시 설치해 수동 재연결·코드 참여·새 동의 후 공유를 시작했다. 내비 전환 뒤 Android 위치 설정을 끄자 서비스가 종료되고 상대 위치가 제거됐다(.gradle/bg-location-off-service.txt). 위치 설정을 다시 켜도 서비스가 자동으로 재개되지 않았다. 화면에 돌아왔을 때 서버 연결 전·공유 중지·차량 정보 없음이 표시됐다(.gradle/bg-no-auto-main.xml).
+
+### 정리·한계
+
+진단 경로는 내비의 안내 종료로 취소했고 위치 설정 true·GPS 기본 시험 전 값으로 복원했다. 수신 클라이언트·로컬 서버는 종료해 그룹/임시 토큰을 지웠다. 테스트용 진단 수집도 종료하고 메인 화면으로 돌아왔으며 공유 서비스가 없는 것을 확인했다(.gradle/bg-cleanup-service.txt). README·local-relay·communication-plan·submission-release-guidelines에 새 수명을 반영했고 docs/background-sharing.md에 실행 조건과 검증 절차를 정리했다.
+
+실차의 내장 데이터망·절전/시동/사용자 전환·장시간 주행·화면 꺼짐·App Market 심사·서명된 Release 런타임은 미검증이다. FGS도 OS 강제 종료나 모든 조건의 5초 주기를 보장하지 않는다. 알림/위치 권한 회수는 정책 검사·시작 게이트로 방어하며 이번 실제 종료 시험은 알림 액션과 위치 설정 해제였다. 시작 제한·2시간 상한은 순수 상태 검사로 검증했다. 60초 연속 연결 오류에 대한 서비스 자동 중지는 코드에 조건을 두었으나 이번 실제 시간 경과 시험은 하지 않았다. 커밋·푸시하지 않았다.
+
+## 2026-11-04 — 백그라운드 공유 커밋 분리와 직접 개발 인계
+
+사용자의 후속 요청으로 백그라운드 작업을 세 단계로 커밋했다. 947b3f4는 명시적 공유 수명 모델·32개 검사·검사 스크립트, a3a0e46은 location Foreground Service·Activity 바인딩·지속 알림/중지·백그라운드 폴링·권한/변형 검사다. 문서 커밋에는 이번 구현/검증 기록과 README·통신/제출 기준, docs/background-sharing.md 및 새 docs/developer-handoff.md를 포함한다. 인계 문서는 현재 구조, PowerShell 기반 검사·빌드·설치·로컬 서버·실제/모의 구분·백그라운드 확인·정리 명령과 파일별 책임·후속 우선순위를 정리한다. Java 178개 검사와 diff 검사를 다시 통과했으며, 이전 네 변형 컴파일·104개 구성 검사·에뮬레이터 검증 결과를 유지한다. 코드 동작은 추가 수정하지 않았다. 사용자 요청대로 에뮬레이터는 꺼 둔 상태로 유지했고 원격 푸시는 하지 않았다.
