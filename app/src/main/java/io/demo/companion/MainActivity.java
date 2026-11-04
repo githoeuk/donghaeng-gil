@@ -26,7 +26,7 @@ public class MainActivity extends Activity {
     private final ParkingState parking = new ParkingState();
     private VehicleParkingSource parkingSource;
     private TextView parkingLabel;
-    private Button demoButton, vehiclePermission;
+    private Button demoButton, groupButton, vehiclePermission;
     private AlertDialog demoIntro;
     private final JourneyState state = new JourneyState();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -70,14 +70,15 @@ public class MainActivity extends Activity {
         root.addView(etaCard, etaLayout);
         eta = text("연결 중", 36, Color.rgb(101, 222, 201)); eta.setTypeface(null, Typeface.BOLD); etaCard.addView(eta);
         etaDetail = text("", 18, Color.rgb(188, 206, 217)); etaCard.addView(etaDetail);
-        TextView note = text("내 차량의 정보입니다. 동행 차량 연결은 준비 중입니다.", 15, Color.rgb(156, 178, 192));
+        TextView note = text("내 차량의 정보입니다. 동행 그룹에서 실제 공유를 시작할 수 있습니다.", 15, Color.rgb(156, 178, 192));
         note.setPadding(0, dp(18), 0, dp(8)); root.addView(note);
         LinearLayout actions = new LinearLayout(this);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
-        if (BuildConfig.HAS_SHARING_DEMO) {
+        {
             parkingLabel = text("차량 상태 확인 중 · 모의 시연 잠김", 16, Color.rgb(169, 190, 203)); root.addView(parkingLabel);
             vehiclePermission = button("차량 상태 접근 허용", () -> requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, VEHICLE_REQUEST)); root.addView(vehiclePermission);
-            demoButton = button("모의 공유 (정차 중)", this::showDemoIntro); demoButton.setEnabled(false); actions.addView(demoButton);
+            groupButton = button("동행 그룹 (서버 연결)", () -> startActivity(new Intent(this, GroupSharingActivity.class))); groupButton.setEnabled(false); actions.addView(groupButton);
+            if (BuildConfig.HAS_SHARING_DEMO) { demoButton = button("모의 공유 (정차 중)", this::showDemoIntro); demoButton.setEnabled(false); actions.addView(demoButton); }
         }
         if (BuildConfig.DEBUG) {
             actions.addView(button("알림 시험", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".NotificationDemoActivity"))));
@@ -85,7 +86,7 @@ public class MainActivity extends Activity {
         root.addView(actions);
         setContentView(scroll);
         source = new PleosJourneySource(this, state, this::render);
-        if (BuildConfig.HAS_SHARING_DEMO) parkingSource = new VehicleParkingSource(this, parking, this::renderParking);
+        parkingSource = new VehicleParkingSource(this, parking, this::renderParking);
     }
     @Override protected void onStart() {
         super.onStart(); source.start(); if (parkingSource != null) parkingSource.start(); handler.post(ticker);
@@ -95,10 +96,10 @@ public class MainActivity extends Activity {
         if (demoIntro != null) demoIntro.dismiss(); super.onStop();
     }
     private void renderParking() {
-        if (demoButton == null) return;
+        if (groupButton == null) return;
         boolean allowed = parking.allowed(SystemClock.elapsedRealtime());
-        demoButton.setEnabled(allowed);
-        parkingLabel.setText((allowed ? "모의 시연 가능 · " : "모의 시연 잠김 · ") + parking.description(SystemClock.elapsedRealtime()));
+        if (demoButton != null) demoButton.setEnabled(allowed); groupButton.setEnabled(allowed);
+        parkingLabel.setText((allowed ? "그룹 설정·모의 시연 가능 · " : "그룹 설정·모의 시연 잠김 · ") + parking.description(SystemClock.elapsedRealtime()));
         vehiclePermission.setVisibility(parkingSource.hasPermission() ? View.GONE : View.VISIBLE);
         if (!allowed && demoIntro != null && demoIntro.isShowing()) demoIntro.dismiss();
     }

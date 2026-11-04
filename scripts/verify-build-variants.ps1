@@ -44,13 +44,20 @@ try {
             $diagnostics = @($application.SelectNodes('activity') | Where-Object { $_.GetAttribute('name',$androidNamespace) -match 'PleosDiagnosticsActivity|NotificationDemoActivity' })
             Assert-Variant (($diagnostics.Count -eq 2) -eq $expectedDebug) "$variant debug tools manifest mismatch"
             $permissions = @($manifest.SelectNodes('/manifest/uses-permission') | ForEach-Object { $_.GetAttribute('name',$androidNamespace) })
-            Assert-Variant (-not ($permissions -contains 'android.permission.INTERNET')) "$variant added network permission"
+            Assert-Variant (($permissions -contains 'android.permission.INTERNET')) "$variant missing network permission"
             Assert-Variant (($permissions -contains 'pleos.car.permission.NAVI_ROUTE_SEARCH') -eq $expectedDebug) "$variant test route permission mismatch"
-            Assert-Variant (($permissions -contains 'android.car.permission.CAR_SPEED') -eq $expectedDemo) "$variant vehicle speed permission mismatch"
-            Assert-Variant (($permissions -contains 'android.car.permission.CAR_POWERTRAIN') -eq $expectedDemo) "$variant gear permission mismatch"
+            Assert-Variant (($permissions -contains 'android.car.permission.CAR_SPEED')) "$variant vehicle speed permission mismatch"
+            Assert-Variant (($permissions -contains 'android.car.permission.CAR_POWERTRAIN')) "$variant gear permission mismatch"
             $library = @($application.SelectNodes('uses-library') | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'android.car' })
             Assert-Variant ($library.Count -eq 1 -and $library[0].GetAttribute('required',$androidNamespace) -eq 'false') "$variant car runtime library declaration mismatch"
             Assert-Variant (Test-Path -LiteralPath "$classes/VehicleParkingSource.class") "$variant missing real vehicle safety source"
+            $real = @($application.SelectNodes('activity') | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'io.demo.companion.GroupSharingActivity' })
+            Assert-Variant ($real.Count -eq 1 -and $real[0].GetAttribute('exported',$androidNamespace) -eq 'false') "$variant real group activity must be internal"
+            Assert-Variant (Test-Path -LiteralPath "$classes/HttpSharingTransport.class") "$variant missing real transport"
+            Assert-Variant ($application.GetAttribute('networkSecurityConfig',$androidNamespace) -eq '@xml/network_security_config') "$variant missing TLS configuration"
+            $securityPath = if($expectedDebug){'app/src/debug/res/xml/network_security_config.xml'}else{'app/src/main/res/xml/network_security_config.xml'}
+            [xml]$security = Get-Content -Raw -LiteralPath $securityPath
+            Assert-Variant ($security.'network-security-config'.'base-config'.cleartextTrafficPermitted -eq 'false' -and ((@($security.SelectNodes('//domain-config')).Count -gt 0) -eq $expectedDebug)) "$variant cleartext policy mismatch"
             $config = Get-Content -Raw -LiteralPath $configFile
             $flag = $expectedDemo.ToString().ToLowerInvariant()
             Assert-Variant ($config -match "HAS_SHARING_DEMO = $flag;") "$variant demo BuildConfig flag mismatch"

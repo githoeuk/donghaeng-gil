@@ -3,9 +3,13 @@
  <uses-permission android:name="pleos.car.permission.NAVI_ROUTE"/>
  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+ <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="android.car.permission.CAR_SPEED"/>
+ <uses-permission android:name="android.car.permission.CAR_POWERTRAIN"/>
  <uses-feature android:name="android.hardware.type.automotive" android:required="true"/>
- <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="동행길" android:allowBackup="false">
+ <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="동행길" android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
   <uses-library android:name="android.car" android:required="false"/>
+  <activity android:name=".GroupSharingActivity" android:exported="false"><meta-data android:name="distractionOptimized" android:value="true"/></activity>
   <receiver android:name=".ReadReceiver" android:exported="false"/>
   <activity android:name=".MainActivity" android:exported="true" android:resizeableActivity="true" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation">
    <meta-data android:name="distractionOptimized" android:value="true"/>

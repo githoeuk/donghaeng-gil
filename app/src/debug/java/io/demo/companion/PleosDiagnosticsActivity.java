@@ -96,11 +96,12 @@ public class PleosDiagnosticsActivity extends Activity {
                 }, 6000);
             }
             if (getIntent().getBooleanExtra("probeRoute", false)) {
-                report("REQUEST_ROUTE synthetic destination 37.4200,127.1000; automatic cancel after 24s");
+                long routeDuration = Math.max(24000, Math.min(600000, getIntent().getLongExtra("probeRouteDurationMs",24000)));
+                report("REQUEST_ROUTE synthetic destination 37.4200,127.1000; automatic cancel after " + routeDuration + "ms");
                 testRouteRequested = true;
                 navi.requestRoute(new RouteInfo(37.4200, 127.1000, null, null,
                         "Donghaeng diagnostic destination", "", "", "", RouteOption.RECOMMENDED, "", false));
-                handler.postDelayed(this::cancelTestRoute, 24000);
+                handler.postDelayed(this::cancelTestRoute, routeDuration);
             }
             return Unit.INSTANCE;
         }, error -> {

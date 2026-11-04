@@ -7,6 +7,8 @@ public interface SharingTransport {
     SharingModels.Snapshot snapshot();
     void createGroup();
     void joinGroup(String inviteCode);
+    /** Latest local sensor state; null withdraws unavailable location. Never queues historical samples. */
+    default void publish(SharingModels.Vehicle own) { }
     void startSharing();
     void stopSharing();
     void leaveGroup();

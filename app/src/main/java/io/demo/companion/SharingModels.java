@@ -33,14 +33,17 @@ public final class SharingModels {
         }
     }
     public static final class Message {
-        public final String id, sender;
+        public final String id, sender, senderId;
         public final MessageKind kind;
         public final long sentAtMillis;
         public final Delivery delivery;
         public Message(String id, String sender, MessageKind kind, long sentAtMillis, Delivery delivery) {
-            this.id = id; this.sender = sender; this.kind = kind; this.sentAtMillis = sentAtMillis; this.delivery = delivery;
+            this(id, "", sender, kind, sentAtMillis, delivery);
         }
-        public Message withDelivery(Delivery value) { return new Message(id, sender, kind, sentAtMillis, value); }
+        public Message(String id, String senderId, String sender, MessageKind kind, long sentAtMillis, Delivery delivery) {
+            this.id = id; this.senderId = senderId; this.sender = sender; this.kind = kind; this.sentAtMillis = sentAtMillis; this.delivery = delivery;
+        }
+        public Message withDelivery(Delivery value) { return new Message(id, senderId, sender, kind, sentAtMillis, value); }
     }
     public static final class Snapshot {
         public final String groupId, inviteCode, notice;
