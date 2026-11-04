@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ai.pleos.playground.navi.data.RecentDestinationInfo;
 
-/** Foreground-only reader. Never changes the destination or uploads location. */
+/** Explicitly started/stopped SDK reader; owner may be an Activity or location foreground service. Never changes routes. */
 public final class PleosJourneySource {
     private final Context context;
     private final JourneyState state;

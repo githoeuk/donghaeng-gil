@@ -30,6 +30,8 @@ public final class HttpSharingTransport implements SharingTransport {
     private long sequence, sentAt = -1;
     private String sentKey = "", roster = "";
     private boolean busy;
+    private long pollIntervalMs=1000;
+    public void setBackground(boolean background){pollIntervalMs=background?5000:1000;}
     private Snapshot current = new Snapshot("","","서버 연결 전 · 실제 위치 전송 중지",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
     public HttpSharingTransport(String endpoint, String name) {
         this.endpoint = RelayEndpoint.validate(endpoint,BuildConfig.DEBUG);
@@ -83,7 +85,7 @@ public final class HttpSharingTransport implements SharingTransport {
                 JSONObject reply=request("POST","/v1/sharing",object("enabled",true));
                 if(closed || revision!=shareRevision)return;
                 shareEpoch=reply.getString("shareEpoch"); sequence=0; sentAt=-1; sentKey=""; desiredSharing=true;
-                handler.post(()->{if(!closed && revision==shareRevision)apply(reply,"실제 위치·목적지·ETA 공유 시작 · 화면을 벗어나면 종료됩니다.");});
+                handler.post(()->{if(!closed && revision==shareRevision)apply(reply,"실제 위치·목적지·ETA 공유 시작 · 다른 앱에서도 유지되며 알림에서 중지할 수 있습니다.");});
             }catch(Exception error){failed(error);}
         });
     }
@@ -95,7 +97,7 @@ public final class HttpSharingTransport implements SharingTransport {
     }
     @Override public void acknowledge(String id){command("/v1/messages/"+id+"/ack",object());}
     private final Runnable ticker = new Runnable(){
-        @Override public void run(){ if(closed)return; poll(); handler.postDelayed(this,1000); }
+        @Override public void run(){ if(closed)return; poll(); handler.postDelayed(this,pollIntervalMs); }
     };
     private void poll(){
         if(closed || bearer.isEmpty() || busy)return;
@@ -126,7 +128,7 @@ public final class HttpSharingTransport implements SharingTransport {
                         reply=request("POST","/v1/messages/"+message.getString("id")+"/received",object());
                 }
                 JSONObject result=reply;
-                handler.post(()->{if(!closed)apply(result,"실제 서버 동기화 · 수신 약 1초 / 위치 전송 약 5초");});
+                handler.post(()->{if(!closed)apply(result,"실제 서버 동기화 · 화면 수신 약 1초 / 다른 앱 사용 중 약 5초");});
             }catch(Exception error){failed(error);}
             finally { handler.post(()->busy=false); }
         });

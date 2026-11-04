@@ -3,6 +3,12 @@ package io.demo.companion;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.os.IBinder;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -21,12 +27,21 @@ import java.util.List;
 import java.util.Locale;
 import static io.demo.companion.SharingModels.*;
 
-/** Foreground-only real sharing. Setup/messages are parked-only; started sharing may continue while visible. */
+/** UI binds to the sharing owner. Leaving this screen does not end explicitly started sharing. */
 public final class GroupSharingActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
-    private final JourneyState journey=new JourneyState();
     private final ParkingState parking=new ParkingState();
-    private PleosJourneySource journeySource;
+    private SharingService service;
+    private boolean binding;
+    private final Runnable observer=this::render;
+    private final ServiceConnection connection=new ServiceConnection(){
+        public void onServiceConnected(ComponentName component,IBinder binder){
+            service=((SharingService.LocalBinder)binder).service();
+            if(!service.endpoint().isEmpty()){endpoint.setText(service.endpoint());name.setText(service.vehicleName());}
+            renderedMessages="initial";service.attach(observer);
+        }
+        public void onServiceDisconnected(ComponentName component){service=null;relay=null;updateText(status,"공유 서비스 연결이 종료됐습니다. 다시 화면을 열어 확인하세요.");}
+    };
     private VehicleParkingSource parkingSource;
     private HttpSharingTransport relay;
     private EditText endpoint,name,code;
@@ -36,7 +51,6 @@ public final class GroupSharingActivity extends Activity {
     private final List<View> parkedControls=new ArrayList<>();
     private AlertDialog consent;
     private final Runnable ticker=new Runnable(){public void run(){
-        if(relay!=null)relay.publish(JourneyPublisher.current(journey,SystemClock.elapsedRealtime(),System.currentTimeMillis()));
         render(); handler.postDelayed(this,1000);
     }};
     @Override public void onCreate(Bundle saved){
@@ -44,7 +58,7 @@ public final class GroupSharingActivity extends Activity {
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root=column(); root.setPadding(28,18,28,24); scroll.addView(root);
         root.addView(text("동행길 · 실제 서버 공유",26));
-        root.addView(text("모의 모드가 아닙니다. 공유 시작을 누른 동안만 실제 위치·목적지·ETA를 전송합니다. 화면을 벗어나면 그룹 연결을 종료합니다.",16));
+        root.addView(text("모의 모드가 아닙니다. 공유 시작 후 내비 등 다른 앱에서도 실제 위치·목적지·ETA를 전송합니다. 중지 버튼이나 지속 알림에서 종료하세요.",16));
         safety=text("차량 상태 확인 중",16);root.addView(safety);
         Button permissions=parkedButton("위치·차량 상태 권한",()->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,VehicleParkingSource.SPEED_PERMISSION},22));root.addView(permissions);
         LinearLayout setup=row();root.addView(setup);
@@ -57,52 +71,69 @@ public final class GroupSharingActivity extends Activity {
         code=edit("","초대 코드");group.addView(code,new LinearLayout.LayoutParams(240,-2));parkedControls.add(code);
         group.addView(parkedButton("그룹 참여",()->{if(relay!=null)relay.joinGroup(code.getText().toString());}));
         group.addView(parkedButton("공유 시작",this::confirmSharing));
-        group.addView(button("공유 중지",()->{if(relay!=null)relay.stopSharing();}));
-        group.addView(button("그룹 나가기",()->{if(relay!=null)relay.leaveGroup();}));
+        group.addView(button("공유 중지",()->{if(service!=null)service.stopSharing();}));
+        group.addView(button("그룹 나가기",()->{if(service!=null)service.leaveGroup();}));
         vehicles=text("서버에서 받은 차량 정보가 없습니다.",17);root.addView(vehicles);
         LinearLayout actions=row();root.addView(actions);
         for(MessageKind kind:MessageKind.values())actions.addView(parkedButton(kind.label,()->{if(relay!=null)relay.send(kind);}));
         messages=column();root.addView(messages);
         root.addView(button("내 차량 화면으로",this::finish));setContentView(scroll);
-        journeySource=new PleosJourneySource(this,journey,()->{});
         parkingSource=new VehicleParkingSource(this,parking,this::render);
     }
     private void connect(){
-        try{
-            if(relay!=null)relay.close();
-            relay=new HttpSharingTransport(endpoint.getText().toString(),name.getText().toString());
-            relay.setListener(snapshot->render());relay.connect();
-        }catch(IllegalArgumentException error){updateText(status,error.getMessage());relay=null;}
+        if(service==null){updateText(status,"공유 서비스 연결을 기다려 주세요.");return;}
+        try{service.connect(endpoint.getText().toString(),name.getText().toString());}
+        catch(IllegalArgumentException error){updateText(status,error.getMessage());}
     }
     private void confirmSharing(){
-        if(relay==null)return;
+        if(service==null || relay==null)return;
+        if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},23);
+            updateText(status,"지속 알림 권한 허용 후 공유 시작을 다시 눌러 주세요.");return;
+        }
         consent=new AlertDialog.Builder(this).setTitle("실제 위치 공유 시작")
-            .setMessage("현재 위치 좌표·주소, 내비 목적지·남은 시간·거리를 입력한 서버와 그룹 구성원에게 보냅니다. 화면 종료 또는 공유 중지 전까지 전송하며 서버는 메모리에서만 임시 보관합니다.\n서버: "+endpoint.getText())
+            .setMessage("현재 위치 좌표·주소, 내비 목적지·남은 시간·거리를 입력한 서버와 그룹 구성원에게 보냅니다. 내비 등 다른 앱으로 이동해도 공유 중지·그룹 탈퇴·앱 작업 종료 전까지 전송합니다. 지속 알림에서 언제든 중지할 수 있습니다. 서버는 메모리에 임시 보관합니다.\n서버: "+endpoint.getText())
             .setNegativeButton("취소",null).setPositiveButton("위치 공유 시작",(dialog,which)->{
-                if(parking.allowed(SystemClock.elapsedRealtime()) && relay!=null)relay.startSharing();
+                if(parking.allowed(SystemClock.elapsedRealtime()) && service!=null)service.requestStart(this,parking);
             }).create();consent.show();
     }
-    @Override protected void onStart(){super.onStart();journeySource.start();parkingSource.start();handler.post(ticker);}
+    @Override protected void onStart(){
+        super.onStart();parkingSource.start();
+        binding=bindService(new Intent(this,SharingService.class),connection,Context.BIND_AUTO_CREATE);
+        handler.post(ticker);
+    }
     @Override protected void onStop(){
-        handler.removeCallbacksAndMessages(null);journeySource.stop();parkingSource.stop();
-        if(consent!=null)consent.dismiss(); if(relay!=null){relay.close();relay=null;} super.onStop();
+        handler.removeCallbacksAndMessages(null);parkingSource.stop();
+        if(consent!=null)consent.dismiss();
+        if(service!=null)service.detach(observer);
+        if(binding){unbindService(connection);binding=false;}
+        service=null;relay=null;super.onStop();
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
         super.onRequestPermissionsResult(request,permissions,results);
-        if(request==22){journeySource.refreshLocation();parkingSource.stop();parkingSource.start();}
+        if(request==22){parkingSource.stop();parkingSource.start();}
+        if(request==23)updateText(status,"알림 권한을 확인했습니다. 공유 시작을 다시 눌러 동의해 주세요.");
     }
     private void render(){
         if(safety==null)return;
+        relay=service==null?null:service.transport();
         boolean parked=parking.allowed(SystemClock.elapsedRealtime());
         updateText(safety,(parked?"정차 확인 · 설정·메시지 가능":"설정·메시지 잠김 · ")+parking.description(SystemClock.elapsedRealtime()));
         for(View control:parkedControls)control.setEnabled(parked);
         if(!parked && consent!=null && consent.isShowing())consent.dismiss();
         if(!parked){endpoint.clearFocus();name.clearFocus();code.clearFocus();android.view.inputmethod.InputMethodManager input=getSystemService(android.view.inputmethod.InputMethodManager.class);if(input!=null)input.hideSoftInputFromWindow(code.getWindowToken(),0);}
-        if(relay==null)return;
+        boolean sharingActive=service!=null && service.active();
+        endpoint.setEnabled(parked && !sharingActive);name.setEnabled(parked && !sharingActive);
+        if(relay==null){
+            updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
+            updateText(vehicles,"공유된 차량 정보가 없습니다.");
+            parkedControls.removeIf(view -> view.getParent()==messages);messages.removeAllViews();renderedMessages="initial";
+            return;
+        }
         Snapshot snapshot=relay.snapshot(); if(snapshot.demo)throw new IllegalStateException("Real screen cannot show mock data");
         updateText(status,(snapshot.groupId.isEmpty()?"그룹 미참여":"그룹 연결 · 초대 코드 "+snapshot.inviteCode)
             +" · "+(snapshot.connection==Connection.CONNECTED?"서버 연결됨":"연결 끊김/요청 확인 필요")
-            +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+snapshot.notice+"\n"+relay.roster());
+            +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+(service.status().isEmpty()?snapshot.notice:service.status())+"\n"+relay.roster());
         long now=SystemClock.elapsedRealtime();Vehicle mine=null;
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
         StringBuilder rows=new StringBuilder();

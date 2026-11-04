@@ -48,6 +48,11 @@ try {
             Assert-Variant (($permissions -contains 'pleos.car.permission.NAVI_ROUTE_SEARCH') -eq $expectedDebug) "$variant test route permission mismatch"
             Assert-Variant (($permissions -contains 'android.car.permission.CAR_SPEED')) "$variant vehicle speed permission mismatch"
             Assert-Variant (($permissions -contains 'android.car.permission.CAR_POWERTRAIN')) "$variant gear permission mismatch"
+            Assert-Variant (($permissions -contains 'android.permission.FOREGROUND_SERVICE') -and ($permissions -contains 'android.permission.FOREGROUND_SERVICE_LOCATION')) "$variant missing location FGS permissions"
+            Assert-Variant (-not ($permissions -contains 'android.permission.ACCESS_BACKGROUND_LOCATION')) "$variant must not add always-on background location permission"
+            $service = @($application.SelectNodes('service') | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'io.demo.companion.SharingService' })
+            Assert-Variant ($service.Count -eq 1 -and $service[0].GetAttribute('exported',$androidNamespace) -eq 'false' -and $service[0].GetAttribute('foregroundServiceType',$androidNamespace) -eq 'location' -and $service[0].GetAttribute('stopWithTask',$androidNamespace) -eq 'true') "$variant invalid sharing service lifecycle/type"
+            Assert-Variant (Test-Path -LiteralPath "$classes/SharingService.class") "$variant missing service implementation"
             $library = @($application.SelectNodes('uses-library') | Where-Object { $_.GetAttribute('name',$androidNamespace) -eq 'android.car' })
             Assert-Variant ($library.Count -eq 1 -and $library[0].GetAttribute('required',$androidNamespace) -eq 'false') "$variant car runtime library declaration mismatch"
             Assert-Variant (Test-Path -LiteralPath "$classes/VehicleParkingSource.class") "$variant missing real vehicle safety source"
