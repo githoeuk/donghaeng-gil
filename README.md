@@ -6,17 +6,21 @@
 
 ## 현재 구현 상태
 
-현재 버전은 **Pleos 에뮬레이터에서 알림 표시 방식을 검증하는 로컬 데모**입니다. 버튼을 누르면 10초 후 가상의 동행자가 보낸 메시지 또는 상태 알림을 생성합니다.
+메인 화면은 **내 차량의 실제 위치와 Pleos 내비게이션의 목적지·남은 시간**을 표시합니다.
 
-- 동행자의 도착시간 공유 메시지
-- 만날 장소 변경 제안 메시지
-- 그룹 메시지 알림과 읽음 처리 액션
-- 도착 예정 시간 상태 알림 시험
-- 표준 Picture-in-Picture(PiP) 지원 여부 시험
+- Android 위치 API에서 위치·정확도·생성 시각을 수신하고, 화면에는 현재 위치와 일치하는 Pleos 주소를 표시합니다.
+- Pleos NaviHelper 3.0.5에서 현재 위치 주소와 목적지의 장소명·주소·남은 시간·남은 거리를 조회합니다.
+- 남은 시간과 수신 시각으로 도착 예정 시각을 표시합니다.
+- 목적지 미설정, 위치 권한 없음, 연결 실패, 데이터 갱신 지연을 구분합니다.
+- GPS와 내비 위치가 300m 이상(위치 정확도 오차 범위의 2배도 초과) 다르면 ‘위치 확인 필요’를 표시합니다.
+- 위치 정확도가 100m보다 나쁘거나 최신 위치를 확인할 수 없어도 ETA에 확인이 필요하다고 표시합니다.
+- 화면을 벗어나면 위치 수신과 내비 조회를 중단합니다. 위치를 서버로 전송하거나 저장하지 않습니다.
 
-실제 차량 간 통신, 사용자·그룹 관리, 위치 공유는 아직 구현하지 않았습니다. 메인 화면과 알림에 나타나는 인물·목적지·도착시간은 고정된 예시 데이터입니다.
+**현재는 내 차량 정보 연동과 Debug 전용 모의 공유 단계입니다.** 실제 동행 차량 간 통신, 그룹 생성·참여, 다른 차량의 위치 공유는 아직 구현하지 않았습니다.
 
-별도의 debug 진단 화면에서 **NaviHelper 위치 조회, 목적지별 ETA 계산, 경로 안내 중 남은 시간 수신, Android GPS 좌표 갱신**을 검증했습니다. 내비 좌표와 GPS가 일치하지 않는 제한도 확인했습니다. [위치·ETA 검증 결과와 재현 방법](docs/pleos-location-eta-verification.md)을 참고하세요.
+[메인 화면 연동 검증](docs/main-screen-integration.md) · [기존 SDK 검증](docs/pleos-location-eta-verification.md)
+
+현재 위치와 내비 좌표가 50m 이내이고 양쪽 데이터가 최신일 때만 내비가 제공한 주소를 현재 위치로 표시합니다. 주소가 없거나 일치하지 않으면 좌표를 보여주는 대신 주소 확인 안내를 표시합니다. 목적지 주소가 동 단위일 때는 Pleos 최근 목적지에서 장소 ID·하위 ID·제공자·이름이 같고 좌표가 100m 이내인 장소의 더 상세한 주소로 보완합니다. 일치 항목이 없으면 원래 내비 주소를 유지합니다. 최근 목적지 정보는 화면 연결 중 메모리에서만 사용하며 저장하거나 로그에 남기지 않습니다. 외부 역지오코딩 서비스나 새로운 네트워크 권한은 추가하지 않았습니다.
 
 ## 실행 환경
 
@@ -29,69 +33,73 @@
 | compileSdk / targetSdk / minSdk | 35 / 34 / 28 |
 | 검증 환경 | Pleos Connect v2.1.0 에뮬레이터, Android API 34 |
 | 애플리케이션 ID | `io.demo.companion` |
+| Pleos SDK | NaviHelper 3.0.5 |
 
-DB, 백엔드 서버, 외부 API 키 없이 실행하는 테스트 앱입니다. debug 빌드의 진단 기능은 공식 Pleos Maven 저장소의 NaviHelper 3.0.5를 사용하며, release 빌드에는 진단 Activity와 SDK 의존성을 포함하지 않습니다. 최초 빌드에는 Gradle·Android 빌드 도구·SDK 다운로드를 위한 인터넷 연결이 필요할 수 있습니다.
+DB·자체 백엔드·별도 API 키 없이 실행합니다. Debug와 Release 모두 공식 Pleos Maven 저장소의 NaviHelper를 사용합니다. 최초 빌드에는 Gradle·Android 빌드 도구·SDK 다운로드를 위한 인터넷 연결이 필요할 수 있습니다.
 
 ## 빌드 및 설치
 
-1. Android Studio에서 저장소 루트 폴더를 엽니다.
+1. Android Studio에서 저장소 루트를 엽니다.
 2. Android SDK Platform 35를 설치하고 Gradle 동기화를 진행합니다.
-3. 로컬 SDK 경로는 Android Studio가 생성하는 `local.properties`에 설정합니다. 이 파일은 Git에 포함하지 않습니다.
+3. Android Studio가 생성하는 `local.properties`에 로컬 SDK 경로를 설정합니다. 이 파일은 Git에 포함하지 않습니다.
 4. Pleos Connect 에뮬레이터를 실행한 뒤 `app`을 실행합니다.
-
-Windows 터미널에서 빌드하려면:
 
 ```powershell
 .\gradlew.bat assembleDebug
 ```
 
-macOS / Linux에서는:
-
-```sh
-sh ./gradlew assembleDebug
-```
+macOS / Linux에서는 `sh ./gradlew assembleDebug`를 실행합니다.
 
 빌드 결과: `app/build/outputs/apk/debug/app-debug.apk`
 
-저장소에 포함한 설치 파일: [동행길 데모 APK](artifacts/donghaeng-gil-demo-debug.apk). 개발용 debug 서명 APK이며 배포용 릴리스 빌드가 아닙니다.
+[설치용 Debug APK](artifacts/donghaeng-gil-demo-debug.apk)는 개발용 서명이며 정식 배포용 Release 빌드가 아닙니다.
 
-Windows에서는 영문 경로에 프로젝트를 두는 것을 권장합니다. 현재 한글 작업 경로에서의 검증은 `-Pandroid.overridePathCheck=true` 옵션을 추가하여 수행했습니다.
+이 PC의 작업 경로는 `D:\projects\donghaeng-gil`입니다. 소스·Gradle 캐시·임시 파일을 D드라이브에서 사용하는 로컬 빌드 스크립트는 다음과 같습니다. 이 스크립트는 저장소 외부의 PC 전용 설정입니다.
 
-## 데모 사용 방법
+```powershell
+& 'D:\projects\build-donghaeng.ps1' -Tasks @('assembleDebug','assembleRelease')
+```
 
-현재 테스트 버튼과 예시 메시지는 영어로 표시됩니다.
+## 메인 화면 사용 방법
 
 1. 앱 목록에서 **동행길**을 실행합니다.
-2. 필요한 경우 `Request notification permission`으로 알림 권한을 허용합니다.
-3. `Clear test notifications`로 기존 시험 알림을 지웁니다.
-4. `Member shares ETA after 10 sec (demo)` 또는 `Member proposes meeting-point change after 10 sec (demo)`를 누릅니다.
-5. 내비게이션 화면으로 이동하여 약 10초 뒤 메시지 표시를 확인합니다.
+2. **내 위치 사용**을 눌러 위치 권한을 허용합니다. 정확한 위치를 권장하며, 대략적 위치만 허용하거나 거부해도 앱은 종료되지 않습니다.
+3. Pleos 내비게이션에서 목적지를 설정하고 경로 안내를 시작합니다.
+4. 동행길로 돌아오면 내 차량 위치, 내비 목적지, 예상 소요 시간과 도착 예정 시각을 확인할 수 있습니다.
+5. 경로를 취소하면 도착시간 표시도 해제됩니다. 연결이 실패하면 **다시 연결**로 재시도할 수 있습니다.
 
-실제 에뮬레이터 시험에서는 그룹 메시지 팝업을 확인했습니다. 표준 PiP는 해당 이미지에서 지원되지 않았고, 일반 ETA 상태 알림은 시스템 등록만 확인했으며 팝업은 표시되지 않았습니다. 이 결과를 다른 차량·Pleos 버전에 일반화할 수 없습니다. 실제 경로 안내 중 시험과 실제 차량 시험은 수행하지 않았습니다.
+에뮬레이터에서 Android GPS와 내비 내부 위치가 서로 다르게 움직이는 현상을 확인했습니다. 위치가 불일치하면 화면에는 내비가 제공한 소요 시간을 참고 정보로 구분하며, 현재 GPS 기준 도착 예정 시각으로 확정해 표시하지 않습니다. 이 동작이 실제 차량에서도 동일하다고 가정하지 않습니다.
 
-자세한 조건과 한계: [Pleos 테스트 결과](docs/pleos-test-results.md)
+## 개발용 시험 화면
 
-## 폴더 구성
+Debug 빌드의 **알림 시험** 버튼으로 기존 로컬 알림·PiP 데모를 열 수 있습니다. 이 화면의 인물·도착시간·메시지는 예시이며 실제 동행자가 보낸 데이터가 아닙니다. Release에는 이 데모 화면과 별도 SDK 진단 Activity가 포함되지 않습니다.
 
-```text
-app/src/main/       Android 앱 소스와 매니페스트
-app/build.gradle    앱 빌드 설정
-docs/               기존 에뮬레이터 시험 기록
-artifacts/          직접 설치 가능한 데모 APK
-gradle/wrapper/     Gradle 실행 환경
+이전 알림 시험의 조건과 한계는 [Pleos 테스트 기록](docs/pleos-test-results.md)을 참고하세요.
+
+## 모의 공유 시연 (Debug 전용)
+
+메인 화면의 **모의 공유 (정차 중)**에서 데모 그룹 생성·코드 참여(`DEMO42`), 모의 차량 3대의 위치·ETA 갱신, 상황 메시지·확인 응답, 연결 끊김·오래된 데이터·공유 중지·그룹 나가기를 시험할 수 있습니다.
+
+**한 에뮬레이터 내부의 가상 시연입니다.** 공식 앱 연동이나 실제 차량 간 통신이 아니며, 실제 위치를 외부에 보내지 않습니다. 화면을 벗어나면 데모 상태를 삭제합니다. 모의 Activity·통신 구현은 Release에 포함되지 않습니다.
+
+[통신 구조와 시연 방법](docs/communication-plan.md) · [최근 작업 결과](docs/work-log.md)
+
+## 상태 처리 테스트
+
+Android 기기 없이 실행 가능한 Java 상태 검증입니다.
+
+```powershell
+.\scripts\test-state.ps1
+# JAVA_HOME 또는 PATH가 없다면 설치된 JDK를 -JdkHome으로 지정
 ```
+
+기존 상태 25개·주소 매칭 11개에 내비 연결 수명 15개와 모의 공유 40개를 더해 총 91개 조건을 확인합니다. 독립 실행 Java 검사이며 Android 에뮬레이터 없이 실행할 수 있습니다.
 
 ## 다음 개발 범위
 
-- 동행 그룹 생성과 참여
-- 동행자 간 도착시간·합류 장소 공유
-- 실제 위치·경로 데이터 연결 및 ETA 계산
-- 주행 중 조작을 최소화하는 화면·알림 설계
+- 실제 인증을 포함한 동행 그룹 생성과 참여
+- 두 기기 사이 최신 위치·도착시간 공유
+- 동행자의 합류 장소 변경 메시지
+- 실제 차량 및 주행 환경 검증
 
-현재 데모는 서버 없이 실행할 수 있습니다. 서로 다른 차량이 실제 데이터를 주고받는 기능에는 별도의 통신 수단이 필요하며, DB 도입 여부는 데이터 저장 요구에 맞춰 결정합니다.
-
-## Git 관리
-
-`.gitignore`는 빌드 산출물, Android Studio 개인 설정, 로컬 SDK 경로, 서명 키 및 환경변수를 제외합니다. DB나 API 사용 여부와 관계없이 필요합니다.
-
-현재 별도의 오픈소스 라이선스는 지정하지 않았습니다.
+`.gitignore`는 빌드 결과, 개인 SDK 경로, IDE 설정, 환경변수와 서명 키를 제외합니다. 현재 별도의 오픈소스 라이선스는 지정하지 않았습니다.

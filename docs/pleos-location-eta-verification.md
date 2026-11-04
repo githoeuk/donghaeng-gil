@@ -1,5 +1,7 @@
 # Pleos 위치·ETA 연동 검증
 
+> 최초 SDK 진단 단계의 기록입니다. 이후 메인 화면 연동과 Release SDK 포함 여부는 [메인 화면 연동 검증](main-screen-integration.md)을 참고하세요.
+
 검증일: 2026-11-04 (한국 시간). 에뮬레이터 로그의 날짜/시각은 호스트와 다르므로 로그 시각을 실제 시험 날짜로 해석하지 않는다.
 
 증거: [선별한 원본 콜백 로그](pleos-probe-evidence.txt). 빌드 검증: assembleDebug 및 assembleRelease.
