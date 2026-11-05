@@ -37,3 +37,39 @@ test('two clients: consent, isolation, location/ETA, delivery, ack, epochs, expi
   await call('POST','/v1/groups/join',c.token,{code:group.inviteCode},404);
  }finally{await new Promise(r=>server.close(r));}
 });
+
+test('invite expires exactly at 30 minutes while active members remain connected',async()=>{
+ let now=100000;const server=createRelay({clock:()=>now});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const url='http://127.0.0.1:'+server.address().port;
+ async function call(path,token,body){const r=await fetch(url+path,{method:body?'POST':'GET',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,body:await r.json()};}
+ try{
+  const a=(await call('/v1/sessions',null,{name:'A'})).body;
+  const b=(await call('/v1/sessions',null,{name:'B'})).body;
+  const c=(await call('/v1/sessions',null,{name:'C'})).body;
+  const group=(await call('/v1/groups',a.token,{})).body;
+  for(let i=0;i<59;i++){now+=30000;await call('/v1/group',a.token);await call('/v1/group',b.token);await call('/v1/group',c.token);}
+  now+=29999;assert.equal((await call('/v1/groups/join',b.token,{code:group.inviteCode})).status,200);
+  await call('/v1/group',a.token);
+  now+=1;const rejected=await call('/v1/groups/join',c.token,{code:group.inviteCode});
+  assert.equal(rejected.status,404);assert.equal(rejected.body.error,'INVALID_OR_EXPIRED_CODE');
+  assert.equal((await call('/v1/group',a.token)).body.members.length,2);
+ }finally{await new Promise(r=>server.close(r));}
+});
+
+test('server restart invalidates sessions and previous invite codes',async()=>{
+ let server=createRelay();await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const port=server.address().port;const url='http://127.0.0.1:'+port;
+ async function call(path,token,body){const r=await fetch(url+path,{method:body?'POST':'GET',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,body:await r.json()};}
+ try{
+  const old=(await call('/v1/sessions',null,{name:'Old'})).body;
+  const group=(await call('/v1/groups',old.token,{})).body;
+  await call('/v1/sharing',old.token,{enabled:true});
+  await new Promise(r=>server.close(r));
+  await assert.rejects(()=>fetch(url+'/health'));
+  server=createRelay();await new Promise(r=>server.listen(port,'127.0.0.1',r));
+  assert.equal((await call('/v1/group',old.token)).status,401);
+  const fresh=(await call('/v1/sessions',null,{name:'New'})).body;
+  assert.equal((await call('/v1/group',fresh.token)).body.groupId,'');
+  assert.equal((await call('/v1/groups/join',fresh.token,{code:group.inviteCode})).status,404);
+ }finally{await new Promise(r=>server.close(r));}
+});
