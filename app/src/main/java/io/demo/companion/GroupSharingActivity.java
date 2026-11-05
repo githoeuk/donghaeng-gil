@@ -46,6 +46,7 @@ public final class GroupSharingActivity extends Activity {
     private HttpSharingTransport relay;
     private EditText endpoint,name,code;
     private TextView safety,status,vehicles,groupHelp;
+    private Button copyInvite;
     private LinearLayout messages;
     private String renderedMessages="initial";
     private final List<View> parkedControls=new ArrayList<>();
@@ -71,6 +72,7 @@ public final class GroupSharingActivity extends Activity {
         group.addView(parkedButton("그룹 만들기",()->{if(relay!=null)relay.createGroup();}));
         code=edit("","초대 코드");group.addView(code,new LinearLayout.LayoutParams(240,-2));parkedControls.add(code);
         group.addView(parkedButton("그룹 참여",()->{if(relay!=null)relay.joinGroup(code.getText().toString());}));
+        copyInvite=parkedButton("초대 코드 복사",this::copyInviteCode);parkedControls.remove(copyInvite);root.addView(copyInvite);
         group.addView(parkedButton("공유 시작",this::confirmSharing));
         group.addView(button("공유 중지",()->{if(service!=null)service.stopSharing();}));
         group.addView(button("그룹 나가기",()->{if(service!=null)service.leaveGroup();}));
@@ -80,6 +82,22 @@ public final class GroupSharingActivity extends Activity {
         messages=column();root.addView(messages);
         root.addView(button("내 차량 화면으로",this::finish));setContentView(scroll);
         parkingSource=new VehicleParkingSource(this,parking,this::render);
+    }
+    private void copyInviteCode(){
+        if(relay==null)return;
+        Snapshot snapshot=relay.snapshot();
+        if(snapshot.groupId.isEmpty() || snapshot.inviteCode.isEmpty()
+            || snapshot.connection!=Connection.CONNECTED)return;
+        android.content.ClipboardManager clipboard=getSystemService(android.content.ClipboardManager.class);
+        if(clipboard==null)return;
+        android.content.ClipData clip=android.content.ClipData.newPlainText("동행길 초대 코드",snapshot.inviteCode);
+        if(android.os.Build.VERSION.SDK_INT>=33){
+            android.os.PersistableBundle extras=new android.os.PersistableBundle();
+            extras.putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE,true);
+            clip.getDescription().setExtras(extras);
+        }
+        clipboard.setPrimaryClip(clip);
+        android.widget.Toast.makeText(this,"초대 코드를 복사했습니다. 동행할 상대에게 직접 전달하세요.",android.widget.Toast.LENGTH_LONG).show();
     }
     private void connect(){
         if(service==null){updateText(status,"공유 서비스 연결을 기다려 주세요.");return;}
@@ -126,6 +144,7 @@ public final class GroupSharingActivity extends Activity {
         boolean sharingActive=service!=null && service.active();
         endpoint.setEnabled(parked && !sharingActive);name.setEnabled(parked && !sharingActive);
         if(relay==null){
+            copyInvite.setEnabled(false);
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
             updateText(groupHelp,"1. 두 차량 모두 같은 서버 주소로 연결하세요. 로컬 시험은 PC에서 중계 서버를 먼저 실행해야 합니다.");
             updateText(vehicles,"공유된 차량 정보가 없습니다.");
@@ -137,11 +156,13 @@ public final class GroupSharingActivity extends Activity {
             +" · "+(snapshot.connection==Connection.CONNECTED?"서버 연결됨":"연결 끊김/요청 확인 필요")
             +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+(service.status().isEmpty()?snapshot.notice:service.status())+"\n"+relay.roster());
         boolean inGroup=!snapshot.groupId.isEmpty();
+        copyInvite.setEnabled(parked && inGroup && !snapshot.inviteCode.isEmpty()
+            && snapshot.connection==Connection.CONNECTED);
         updateText(groupHelp,snapshot.connection!=Connection.CONNECTED
             ?"서버 연결 상태를 확인하세요. 두 차량이 같은 서버에 연결되어야 참여할 수 있습니다."
             :!inGroup
                 ?"2. 처음 시작하는 차량은 ‘그룹 만들기’를 누르세요. 참여하는 차량은 상대에게 받은 초대 코드를 입력하고 ‘그룹 참여’를 누르세요."
-                :"3. 표시된 초대 코드를 상대에게 직접 알려 주세요. 상대는 같은 서버에서 코드를 입력해 참여합니다. 각 차량이 동의 후 ‘공유 시작’을 눌러야 위치가 전송됩니다. 코드는 생성 후 30분간 유효합니다.");
+                :"3. 초대 코드를 복사해 상대에게 직접 전달하세요. 상대는 같은 서버에서 코드를 입력해 참여합니다. 각 차량이 동의 후 ‘공유 시작’을 눌러야 위치가 전송됩니다. 코드는 생성 후 30분간 유효합니다.");
         long now=SystemClock.elapsedRealtime();Vehicle mine=null;
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
         StringBuilder rows=new StringBuilder();
