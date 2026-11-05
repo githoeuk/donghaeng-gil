@@ -167,12 +167,16 @@ public final class GroupSharingActivity extends Activity {
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
         StringBuilder rows=new StringBuilder();
         for(Vehicle vehicle:snapshot.vehicles){
+            if(vehicle.stale(now) || snapshot.connection!=Connection.CONNECTED){
+                rows.append(vehicle.name).append(vehicle.id.equals(relay.userId())?" (나)":" (동행)")
+                    .append(" · 최신 위치·목적지·ETA 확인 불가 · 갱신 지연\n\n");
+                continue;
+            }
             rows.append(vehicle.name).append(vehicle.id.equals(relay.userId())?" (나)":" (동행)").append(" · ")
                 .append(vehicle.address.isEmpty()?"주소 확인 중":vehicle.address).append('\n');
             if(BuildConfig.DEBUG)rows.append(String.format(Locale.ROOT,"개발용 좌표 %.6f, %.6f\n",vehicle.latitude,vehicle.longitude));
             rows.append(vehicle.destinationName.isEmpty()?"목적지 없음/확인 중":vehicle.destinationName).append(" · ").append(vehicle.destinationAddress).append('\n');
-            if(vehicle.stale(now) || snapshot.connection!=Connection.CONNECTED)rows.append("최신 위치·ETA 확인 불가 · 갱신 지연");
-            else if(vehicle.remainingSeconds<0)rows.append("ETA 확인 중 · 내비/위치 조건 확인 필요");
+            if(vehicle.remainingSeconds<0)rows.append("ETA 확인 중 · 내비/위치 조건 확인 필요");
             else rows.append("약 ").append((vehicle.remainingSeconds+59)/60).append("분 · ")
                 .append(String.format(Locale.KOREA,"%.1fkm",vehicle.remainingMeters/1000.0)).append(" · ")
                 .append(new SimpleDateFormat("HH:mm",Locale.KOREA).format(new Date(vehicle.generatedAtMillis+vehicle.remainingSeconds*1000L))).append(" 도착 예정");
