@@ -45,7 +45,7 @@ public final class GroupSharingActivity extends Activity {
     private VehicleParkingSource parkingSource;
     private HttpSharingTransport relay;
     private EditText endpoint,name,code;
-    private TextView safety,status,vehicles;
+    private TextView safety,status,vehicles,groupHelp;
     private LinearLayout messages;
     private String renderedMessages="initial";
     private final List<View> parkedControls=new ArrayList<>();
@@ -66,6 +66,7 @@ public final class GroupSharingActivity extends Activity {
         name=edit("차량","차량 이름");setup.addView(name,new LinearLayout.LayoutParams(0,-2,1));
         setup.addView(parkedButton("서버 연결",this::connect)); parkedControls.add(endpoint); parkedControls.add(name);
         status=text("서버 연결 전 · 위치 전송 중지",17);root.addView(status);
+        groupHelp=text("두 차량 모두 같은 서버에 연결하세요. 한 차량이 그룹을 만들고, 다른 차량은 받은 초대 코드로 참여합니다.",16);root.addView(groupHelp);
         LinearLayout group=row();root.addView(group);
         group.addView(parkedButton("그룹 만들기",()->{if(relay!=null)relay.createGroup();}));
         code=edit("","초대 코드");group.addView(code,new LinearLayout.LayoutParams(240,-2));parkedControls.add(code);
@@ -126,6 +127,7 @@ public final class GroupSharingActivity extends Activity {
         endpoint.setEnabled(parked && !sharingActive);name.setEnabled(parked && !sharingActive);
         if(relay==null){
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
+            updateText(groupHelp,"1. 두 차량 모두 같은 서버 주소로 연결하세요. 로컬 시험은 PC에서 중계 서버를 먼저 실행해야 합니다.");
             updateText(vehicles,"공유된 차량 정보가 없습니다.");
             parkedControls.removeIf(view -> view.getParent()==messages);messages.removeAllViews();renderedMessages="initial";
             return;
@@ -134,6 +136,12 @@ public final class GroupSharingActivity extends Activity {
         updateText(status,(snapshot.groupId.isEmpty()?"그룹 미참여":"그룹 연결 · 초대 코드 "+snapshot.inviteCode)
             +" · "+(snapshot.connection==Connection.CONNECTED?"서버 연결됨":"연결 끊김/요청 확인 필요")
             +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+(service.status().isEmpty()?snapshot.notice:service.status())+"\n"+relay.roster());
+        boolean inGroup=!snapshot.groupId.isEmpty();
+        updateText(groupHelp,snapshot.connection!=Connection.CONNECTED
+            ?"서버 연결 상태를 확인하세요. 두 차량이 같은 서버에 연결되어야 참여할 수 있습니다."
+            :!inGroup
+                ?"2. 처음 시작하는 차량은 ‘그룹 만들기’를 누르세요. 참여하는 차량은 상대에게 받은 초대 코드를 입력하고 ‘그룹 참여’를 누르세요."
+                :"3. 표시된 초대 코드를 상대에게 직접 알려 주세요. 상대는 같은 서버에서 코드를 입력해 참여합니다. 각 차량이 동의 후 ‘공유 시작’을 눌러야 위치가 전송됩니다. 코드는 생성 후 30분간 유효합니다.");
         long now=SystemClock.elapsedRealtime();Vehicle mine=null;
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
         StringBuilder rows=new StringBuilder();
