@@ -30,6 +30,8 @@ public final class HttpSharingTransport implements SharingTransport {
     private long sequence, sentAt = -1;
     private String sentKey = "", roster = "";
     private boolean busy;
+    private boolean sessionInvalid;
+    private String actionNotice = "";
     private long pollIntervalMs=1000;
     public void setBackground(boolean background){pollIntervalMs=background?5000:1000;}
     private Snapshot current = new Snapshot("","","서버 연결 전 · 실제 위치 전송 중지",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
@@ -69,7 +71,7 @@ public final class HttpSharingTransport implements SharingTransport {
         if(closed)return;
         worker.execute(()->{
             if(closed)return;
-            try { JSONObject reply=request("POST",path,body); handler.post(()->{if(!closed)apply(reply,"요청 반영됨 · 실제 서버 연결");}); }
+            try { JSONObject reply=request("POST",path,body); handler.post(()->{if(!closed){actionNotice="";apply(reply,"요청 반영됨 · 실제 서버 연결");}}); }
             catch(Exception error){failed(error);}
         });
     }
@@ -100,7 +102,7 @@ public final class HttpSharingTransport implements SharingTransport {
         @Override public void run(){ if(closed)return; poll(); handler.postDelayed(this,pollIntervalMs); }
     };
     private void poll(){
-        if(closed || bearer.isEmpty() || busy)return;
+        if(closed || sessionInvalid || bearer.isEmpty() || busy)return;
         busy=true; final Vehicle own=latest; final long revision=shareRevision, capturedAt=SystemClock.elapsedRealtime();
         worker.execute(()->{
             if(closed)return;
@@ -134,6 +136,7 @@ public final class HttpSharingTransport implements SharingTransport {
         });
     }
     private void apply(JSONObject reply,String notice){
+        if(sessionInvalid)return;
         try {
             String group=reply.getString("groupId");
             if(group.isEmpty()){desiredSharing=false; shareEpoch="";}
@@ -158,12 +161,28 @@ public final class HttpSharingTransport implements SharingTransport {
                     MessageKind.valueOf(message.getString("kind")),message.getLong("sentAt"),Delivery.valueOf(message.getString("delivery"))));
             }
             roster=names.toString();
-            current=new Snapshot(group,reply.getString("inviteCode"),notice,desiredSharing,false,Connection.CONNECTED,vehicles,messages); emit();
+            current=new Snapshot(group,reply.getString("inviteCode"),actionNotice.isEmpty()?notice:actionNotice,desiredSharing,false,Connection.CONNECTED,vehicles,messages); emit();
         }catch(Exception error){notice("서버 데이터 형식 확인 필요",Connection.DISCONNECTED);}
     }
     private void failed(Exception error){
         final String message=error instanceof ApiException ? ((ApiException)error).code : "NETWORK_ERROR";
-        handler.post(()->{if(!closed)notice("연결·요청 확인 필요: "+message+" · 메시지 자동 재전송 없음",Connection.DISCONNECTED);});
+        handler.post(()->{
+            if(closed || sessionInvalid)return;
+            if("UNAUTHORIZED".equals(message)){
+                sessionInvalid=true;desiredSharing=false;shareEpoch="";shareRevision++;latest=null;roster="";
+                current=new Snapshot("","","서버 재시작 또는 세션 만료 · 서버 연결을 다시 누르고 새 그룹 생성/참여 후 공유에 다시 동의하세요.",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
+                emit();
+            }else if("INVALID_OR_EXPIRED_CODE".equals(message)){
+                actionNotice="초대 코드가 틀렸거나 만료됐습니다. 상대에게 새 그룹의 코드를 받아 다시 입력하세요.";notice(actionNotice,current.connection);
+            }else if("LEAVE_FIRST".equals(message)){
+                actionNotice="이미 그룹에 참여 중입니다. 다른 그룹에 참여하려면 먼저 그룹에서 나가세요.";notice(actionNotice,current.connection);
+            }else if("GROUP_FULL".equals(message)){
+                actionNotice="참여 차량이 가득 찬 그룹입니다. 다른 그룹 코드를 확인하세요.";notice(actionNotice,current.connection);
+            }else{
+                current=new Snapshot(current.groupId,current.inviteCode,"서버에 연결할 수 없습니다. 최신 위치·ETA를 숨깁니다. 서버 상태를 확인하세요. 메시지는 자동 재전송하지 않습니다.",desiredSharing,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
+                emit();
+            }
+        });
     }
     private JSONObject request(String method,String path,JSONObject body)throws Exception{
         long requestAt=SystemClock.elapsedRealtime();

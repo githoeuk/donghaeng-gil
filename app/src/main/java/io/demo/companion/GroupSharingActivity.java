@@ -154,7 +154,7 @@ public final class GroupSharingActivity extends Activity {
         Snapshot snapshot=relay.snapshot(); if(snapshot.demo)throw new IllegalStateException("Real screen cannot show mock data");
         updateText(status,(snapshot.groupId.isEmpty()?"그룹 미참여":"그룹 연결 · 초대 코드 "+snapshot.inviteCode)
             +" · "+(snapshot.connection==Connection.CONNECTED?"서버 연결됨":"연결 끊김/요청 확인 필요")
-            +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+(service.status().isEmpty()?snapshot.notice:service.status())+"\n"+relay.roster());
+            +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+snapshot.notice+(service.status().isEmpty()?"":"\n"+service.status())+"\n"+relay.roster());
         boolean inGroup=!snapshot.groupId.isEmpty();
         copyInvite.setEnabled(parked && inGroup && !snapshot.inviteCode.isEmpty()
             && snapshot.connection==Connection.CONNECTED);
