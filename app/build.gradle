@@ -1,5 +1,7 @@
 plugins { id 'com.android.application' }
 
+def localHttpsCa = providers.gradleProperty('donghaengLocalTlsCa').orNull
+
 android {
     namespace 'io.demo.companion'
     buildFeatures { buildConfig true }
@@ -22,7 +24,10 @@ android {
         }
     }
     buildTypes {
-        debug { buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true' }
+        debug {
+            buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true'
+            manifestPlaceholders.debugNetworkSecurityConfig = localHttpsCa ? '@xml/network_security_config_local_tls' : '@xml/network_security_config'
+        }
         release {
             debuggable false
             // Signing is deliberately not configured in this step.
@@ -57,5 +62,52 @@ def releaseDistributionGate = tasks.register('verifyReleaseDistributionConfigure
 tasks.configureEach {
     if (name in ['packageStandardRelease', 'packageSubmissionRelease', 'bundleStandardRelease', 'bundleSubmissionRelease']) {
         dependsOn releaseDistributionGate
+    }
+}
+
+
+// Optional per-build public CA, scoped to exact loopback/emulator hosts in Debug only.
+// No OS trust-store changes, custom TrustManager, or Release source-set inclusion.
+abstract class GenerateLocalHttpsResources extends DefaultTask {
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getCaFile()
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+    @TaskAction
+    void generate() {
+        def pem = caFile.get().asFile.getText('UTF-8')
+        if (pem.contains('PRIVATE KEY') || pem.count('-----BEGIN CERTIFICATE-----') != 1) {
+            throw new GradleException('Local TLS input must contain exactly one public CA certificate, never a private key.')
+        }
+        def factory = java.security.cert.CertificateFactory.getInstance('X.509')
+        def certificate = factory.generateCertificate(new ByteArrayInputStream(pem.getBytes('UTF-8')))
+        certificate.checkValidity()
+        if (certificate.basicConstraints < 0) throw new GradleException('Local TLS certificate must be a CA.')
+        def root = outputDirectory.get().asFile
+        new File(root, 'raw').mkdirs()
+        new File(root, 'xml').mkdirs()
+        new File(root, 'raw/local_https_ca.pem').setText(pem, 'UTF-8')
+        new File(root, 'xml/network_security_config_local_tls.xml').setText('''<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>10.0.2.2</domain>
+        <domain>127.0.0.1</domain>
+        <domain>localhost</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/local_https_ca" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
+''', 'UTF-8')
+    }
+}
+if (localHttpsCa) {
+    def generateLocalTls = tasks.register('generateLocalHttpsDebugResources', GenerateLocalHttpsResources) {
+        caFile.set(file(localHttpsCa))
+        outputDirectory.set(layout.buildDirectory.dir('generated/localHttpsDebug/res'))
+    }
+    androidComponents.onVariants(androidComponents.selector().withBuildType('debug')) { variant ->
+        variant.sources.res.addGeneratedSourceDirectory(generateLocalTls, { it.outputDirectory })
     }
 }
