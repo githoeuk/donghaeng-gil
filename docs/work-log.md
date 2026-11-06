@@ -416,3 +416,7 @@ Pleos Connect v2.1.0, Android14/API34, emulator-5554/user10에서 실행했다. 
 - evidence: .gradle/outage-service-before.txt, outage-short-block-service.txt, outage-short-recovered-service.txt, outage-service-timeline.jsonl, outage-long-service-*.txt, outage-after-long-service.txt, outage-return-group.xml/png, outage-summary.json. 요약 스크립트는 단기 복구 새GPS/순서/신선도 및 장기 서비스 소멸·해제 후10개 이상 표본의 자동 재개 부재를 확인해 통과했다. 최종 공유 알림 개수는 outage-notification-final.json에 기록했다.
 - 이번 범위에서 보완이 필요한 오류는 재현되지 않아 앱/서버 소스를 수정하지 않았다. 기존 자동 검사·빌드 결과를 변경하지 않았고 런타임 증거/문서 diff를 검사했다. 메시지 장애 재전송·실차 네트워크·온라인 HTTPS·서명된 Release·장시간 절전은 이번 검증 범위가 아니다.
 - GPS 갱신 프로세스를 종료하고 기록한 원래 AVD GPS로 복원했다. 내비 안내 종료를 눌러 시험 경로가 사라진 화면/XML을 확인했다. 앱 강제 종료·공유 서비스 없음 확인, 확인한 Node fixture PID 종료(메모리 그룹/임시 토큰 제거), 에뮬레이터 종료로 정리했다. AVD 영구 설정·SDK는 변경하지 않았으며 커밋·푸시하지 않았다.
+
+## 2026-11-06 — 그룹 접근 기준 문서 커밋
+
+docs/group-access-control.md에 그룹장·코드 재발급/폐기·참여 승인/거절·강제 퇴장의 최소 기준을 정의했다. README와 실행·통신·제출 가이드를 accessVersion 2 계약에 맞춰 정리했다. 계정/차량 소유 인증·온라인 배포·실차·Release 검증은 별도 범위다.

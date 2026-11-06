@@ -88,3 +88,7 @@ SharingDemoActivity → SharingTransport ← 향후 실제 통신 어댑터
 ## 2026-11-04 location Foreground Service
 
 실제 공유의 SDK 수집·통신 수명은 SharingService로 이동했다. 동의 후에는 내비 등 다른 앱에서도 유지하고 GroupSharingActivity는 바인딩으로 동일 세션을 표시한다. 모의 화면은 종전대로 이탈 시 종료한다. 지속 알림·권한·중지·프로세스 종료와 자동 재시작 금지 정책은 [백그라운드 공유](background-sharing.md)를 따른다. 앞 절의 실제 공유 화면 이탈 시 종료 설명은 이 변경으로 대체한다. 현재 Java 검사는 178개, 변형 구성 검사는 104개다.
+
+## 2026-11-06 실제 그룹 접근 관리
+
+실제 그룹은 생성자만 코드 재발급/폐기와 참여 승인/거절·강제 퇴장을 수행한다. 서버가 세션 소유권을 검사하며, 승인 전에는 위치·메시지를 공개하지 않는다. 그룹장 탈퇴/유휴 만료 시 전체 그룹을 종료하고 새 공유 동의를 요구한다. [세부 기준](group-access-control.md)과 [실행/API](local-relay.md)를 따른다. SharingTransport의 모의 구현과 공식 휴대폰 연동 목표는 유지하며, 공식 앱 API를 가정해 추가하지 않았다.
