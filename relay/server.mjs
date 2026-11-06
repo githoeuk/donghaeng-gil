@@ -173,6 +173,6 @@ export function createRelay({clock = Date.now} = {}) {
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const host=process.env.HOST || '127.0.0.1', port=Number(process.env.PORT || 8787);
-  const server=createRelay(); server.listen(port,host,()=>console.log(`Donghaeng relay listening on ${host}:${port} (in-memory, API v1)`));
+  const server=createRelay(); server.listen(port,host,()=>console.log(`Donghaeng relay listening on ${host}:${port} (in-memory, API v2; routes /v1)`));
   process.on('SIGTERM',()=>server.close()); process.on('SIGINT',()=>server.close());
 }

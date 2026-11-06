@@ -1,0 +1,19 @@
+# Compose 2.24.4+; combine with compose.yaml and local.env.example.
+# Replaces published ports and mounts; never starts online ACME for this check.
+services:
+  caddy:
+    environment:
+      LOCAL_TLS_PORT: 8443
+      LOCAL_TLS_BIND: 0.0.0.0
+      LOCAL_TLS_CERT: /certs/server.crt
+      LOCAL_TLS_KEY: /certs/server.key
+      LOCAL_TLS_STORAGE: /data/local-test
+    ports: !override
+      - "127.0.0.1:8443:8443"
+    volumes: !override
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - ./proxy.caddy:/etc/caddy/proxy.caddy:ro
+      - ${LOCAL_TLS_DIR:-../../.gradle/local-https}/server.crt:/certs/server.crt:ro
+      - ${LOCAL_TLS_DIR:-../../.gradle/local-https}/server.key:/certs/server.key:ro
+      - caddy_data:/data
+      - caddy_config:/config

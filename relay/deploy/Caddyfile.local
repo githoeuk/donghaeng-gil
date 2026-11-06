@@ -1,0 +1,27 @@
+{
+	admin off
+	storage file_system {
+		root "{$LOCAL_TLS_STORAGE}"
+	}
+	persist_config off
+	auto_https off
+	default_sni localhost
+	log {
+		exclude http.log.error
+	}
+	servers {
+		protocols h1 h2
+		timeouts {
+			read_header 5s
+			read_body 10s
+			write 15s
+			idle 30s
+		}
+		max_header_size 16KB
+	}
+}
+https://:{$LOCAL_TLS_PORT:8443} {
+	bind {$LOCAL_TLS_BIND:127.0.0.1}
+	tls "{$LOCAL_TLS_CERT}" "{$LOCAL_TLS_KEY}"
+	import proxy.caddy
+}

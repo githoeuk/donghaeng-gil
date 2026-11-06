@@ -1,0 +1,6 @@
+# No SDK cache, TLS private keys, tests, or local .env files enter the image.
+*
+!Dockerfile
+!package.json
+!server.mjs
+!healthcheck.mjs
