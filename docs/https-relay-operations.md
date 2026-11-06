@@ -110,3 +110,9 @@ docker compose @composeArgs down
 ```
 
 호스트의 네이티브 HTTPS 프로세스가8443을 사용 중이면 먼저 stop-local-https.ps1로 종료한다. `donghaeng-relay-check`라는 별도 프로젝트만 생성/종료하며 다른 컨테이너를 정리하거나 전체 Docker prune을 하지 않는다. 실제 업데이트/컨테이너 확인 결과는 work-log를 따른다.
+
+### 두 Android 앱으로 Docker HTTPS를 검증할 때
+
+2026-11-06에 두 Pleos 에뮬레이터에서 위 Docker 중계로 참여 요청·승인·각자 동의·양방향 SDK ETA·양방향 메시지 확인·그룹 종료를 확인했다. 내비를 먼저 한 번 실행하고 국내 시험 GPS가 반영된 뒤 경로 안내를 시작한다. 경로 요청 직후의 빈 목적지/SAFE_GUIDING 응답만으로 실패나 성공을 판정하지 않고, 양쪽 내비 안내 화면과 동행길의 유효한 목적지·ETA를 확인한 뒤 공유한다. 내비의 경로 재개 확인창이 있으면 먼저 처리한다. 실제 결과·증거·한계는 work-log의 해당 날짜 기록을 따른다.
+
+실시간 갱신 화면에서는 uiautomator idle 수집이 실패할 수 있다. 이전 XML을 성공 증거로 재사용하지 않고 최신 스크린샷·공유 FGS 상태·종료 상태의 새 XML로 확인한다. 시험 후 양쪽 경로 종료, GPS 복원, 일반 Debug 재설치와 시험 Compose 프로젝트 종료를 수행한다.
