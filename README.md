@@ -143,3 +143,7 @@ Android 기기 없이 실행 가능한 Java 상태 검증입니다.
 ## 그룹 접근 관리
 
 실제 공유는 [그룹 접근 권한 기준](docs/group-access-control.md)을 따른다. 그룹장이 초대 코드를 재발급/폐기하고 참여 요청을 승인/거절하거나 구성원을 내보낼 수 있다. 코드 입력만으로 위치·ETA를 받지는 못하며 승인 후에도 각 차량의 공유 동의가 필요하다. 그룹장 탈퇴/연결 만료 시 그룹 전체가 종료된다. 최신 앱과 accessVersion 2 서버를 함께 사용한다. 계정/차량 소유 인증과 온라인 배포는 별도 후속 작업이다.
+
+## HTTPS 배포 준비
+
+[Caddy/Compose 배포 설정과 운영 가이드](docs/https-relay-operations.md)를 제공한다. 로컬 TLS 시험은 명시적 `donghaengLocalTlsCa` 속성을 준 Debug에서만 정확한 로컬 호스트에 시험 CA를 추가한다. 기본 Debug·Release는 해당 CA를 포함하지 않는다. 공인 도메인/서버를 이용한 온라인 배포 여부와 두 에뮬레이터의 검증 결과는 work-log를 따른다.

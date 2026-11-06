@@ -498,3 +498,54 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - A 통신을 복구한 뒤43,238ms 추가 관찰했다. 양쪽 FGS는20초/40초 표본에서 계속 꺼져 있었고 자동 세션 생성·그룹 생성/참여·공유 시작·위치 업로드가 없었다. B는 서버 GET 폴링을 유지하면서 계속 그룹 없음·구성원0·메시지0을 받았고 A의 HTTP 응답은0건이었다(owner3-no-auto-b.png). 이후 A 그룹 화면 복귀에서도 '서버 연결 전 · 위치 공유 중지', 이전 공유 위치/ETA 없음, 양쪽 FGS 없음이 확인됐다(two-owner3-a-return-after-long.xml, owner3-a-return.png, after-return-service.txt).
 - owner3-run.mjs·owner3-summarize.mjs의 실제 HTTP/서비스 수명 대조와 B 종료/A 복귀 화면 XML 검사를 통과했다. 이번 범위에서 기능 결함은 발견되지 않아 소스를 보완하거나 재빌드·기존 단위/서버/네 변형 검사를 재실행하지 않았다. 공식 휴대폰 앱 연동·실차·온라인 HTTPS·양쪽 동시 단절·서명된 Release 검증은 이번 범위가 아니다. Release 키·제출 APK는 만들지 않았다.
 - 정리: 정확한 GPS feeder PID를 종료하고 두 앱 강제 종료·FGS 없음, 양쪽 내비 안내 종료 및 '어디로 갈까요?' 화면을 확인했다. 저장한 원래 GPS를 각각 복원하고 두 에뮬레이터와 정확한 fixture PID의 중계/프록시를 종료했다. 양쪽 AVD config.ini SHA256 동일을 확인했고 AVD·설치 앱·기존 허용 권한은 유지했다. 변경은 work-log뿐이며 diff 검사를 통과했다. 커밋·푸시하지 않았다.
+
+## 2026-11-06 — HTTPS 중계 배포 설정·운영 가이드와 로컬 TLS 검증
+
+- main/origin main 593b22e, 작업 트리 깨끗한 상태에서 시작했다. 작업 규칙·제출 가이드·통신 계획을 확인했다. 사용자에게 서버/도메인 보유 여부를 확인했고 '아직 없음 — 우선 로컬 HTTPS까지 검증' 답변에 따라 공인 온라인 배포 대신 로컬 HTTPS로 범위를 정했다. 커밋·푸시하지 않았다.
+- relay/deploy에 Compose, 온라인 Caddyfile, 로컬 Caddyfile.local과 공통 proxy.caddy, .env.example, 실제 HTTPS smoke.mjs를 추가했다. 단일 Node RAM 중계는 내부 네트워크에만 두고 외부80/443은 Caddy만 연다. relay는 비관리자 node 사용자·읽기 전용·cap_drop·healthcheck, Caddy는 인증서 volume·재시작·로그 회전을 사용한다. 공유 API/DB/계정 체계는 바꾸지 않았다.
+- Dockerfile에 개인정보 없는 healthcheck.mjs를 포함하고 .dockerignore로 이미지 입력을 실행 파일4개로 제한했다. health는200/ok:true/apiVersion:2를 검사한다. 서버 시작 문구의 API v1 표기를 실제 계약에 맞는 API v2/routes /v1로 정정했다. health가 unhealthy인 것만으로 Docker가 자동 재시작하는 것은 아니라는 운영 한계도 문서에 썼다.
+- proxy.caddy는 허용 API 경로·16KB 본문·연결/응답 대기 제한을 공통 적용한다. 인증 헤더는 전달하고 access log를 켜지 않으며 요청 메타데이터가 섞일 수 있는 http.log.error도 제외한다. Node 포트 직접 공개·다중 인스턴스·서버 재시작 후 세션 복원을 지원하는 구성으로 설명하지 않는다.
+- docs/https-relay-operations.md에 DNS/포트·인증서 발급과 보관·시작/health·로그·업데이트/롤백·종료·메모리 소실·Windows 로컬 TLS 실행을 작성했다. README/local-relay/communication-plan/submission-release-guidelines에 연결과 시험 신뢰 경계를 추가했다. 공식 Caddy/Compose/Android 문서 링크를 근거로 남겼다.
+- Docker Compose 구성 해석과 내부 네트워크/relay 비공개/읽기 전용/edge80·443 검사를 통과했다. Docker Desktop은 시작을 시도했으나 'unable to start'로 엔진을 사용할 수 없어 종료했다. Docker 이미지 pull/build·컨테이너 구동·공인 DNS/ACME/외부 네트워크는 미검증이다. OS 가상화 설정 변경이나 추가 설치로 우회하지 않았다.
+- 공식 Windows Caddy2.11.9 아카이브를 공식 SHA512 checksums와 대조해 D:\projects\tools\caddy-2.11.9에 준비했다. 온라인 Caddy 설정의 validate를 통과했다. 실제 런타임 검증은 Caddy 네이티브와 기존 D:\node.exe24.18.0으로 수행했다. 로컬 Caddy/Node는127.0.0.1에만 바인딩하고 상태·인증서·로그는 Git 제외 .gradle/local-https에 둔다.
+- scripts/start-local-https.ps1이7일짜리 시험 CA/서버 TLS 인증서(SAN localhost/127.0.0.1/10.0.2.2)를 만들고 숨김 프로세스를 시작·health 확인한다. stop-local-https.ps1은 저장 PID의 실행 파일·명령행을 대조해 해당 프로세스만 멈춘다. 환경변수는 복원하며 OS/Android CA 저장소는 바꾸지 않는다. 이것은 APK 서명 키 생성이 아니다.
+- 실제 TLS1.3 smoke를 통과했다. 명시적 CA 없이 사설 인증서 거절, 올바른 CA여도 다른 호스트명 거절, HTTPS health200·미등록 경로404·무인증401·큰 본문413, 합성 두 세션의 승인 대기 비노출/승인/개별 공유/좌표·ETA/메시지 수신·확인/공유 중지/그룹 종료를 검사했다. 토큰·응답 본문은 출력하지 않는다. 이 PC 합성 데이터 시험과 아래 실제 Android SDK 시험은 구분한다.
+- Node만 멈춘 동안 HTTPS health502를 확인하고 두 프로세스의 종료/재시작 후 health와 TLS smoke를 다시 통과했다. 최종 서버 HTTP 자동 검사5개도 모두 통과했다. PowerShell 구문·Node 문법·Git diff 검사와 Caddy 로그의 토큰/시험 이름/위치 본문 비포함 확인을 수행했다.
+
+## 2026-11-06 — 명시적 Debug 전용 로컬 CA 빌드 분리
+
+- app/build.gradle에 donghaengLocalTlsCa 속성으로 지정한 공개 CA 한 개를 생성 리소스로 넣는 Debug 전용 작업을 추가했다. debug manifest만 해당 빌드의 networkSecurityConfig를 선택한다. 일반 Debug와 두 Release의 기본 시스템 CA/평문 정책은 유지한다. 앱 Java TLS 코드·TrustManager·hostname 검증은 수정하지 않았다.
+- 추가 신뢰는 정확한10.0.2.2/127.0.0.1/localhost 도메인 설정에만 둔다. 다른 HTTPS 호스트·사용자 CA 전체·Release에 신뢰를 확장하지 않는다. CA 검증에서 유효 기간/CA 속성/한 개 공개 인증서 조건을 검사하고 개인 키를 거절한다. 인증서 속성을 gradle.properties에 저장하지 않는다.
+- opt-in standardDebug 빌드 성공과 APK 내부 공개 CA/전용 XML 포함을 확인했다. 같은 속성을 준 두 Release 리소스 처리도 통과했고 실제 linked resource archive에 시험 CA/XML이 없었다. 속성 없는 일반 standardDebug를 다시 빌드해 APK에도 CA/XML이 없음을 확인했다. 공개 CA만 시험 APK에 들어가며 TLS 개인 키는 들어가지 않는다.
+- root.key를 인증서 입력으로 준 생성 작업이 '공개 CA 한 개' 조건으로 실패하고 server.crt를 준 작업이 'CA여야 함'으로 실패하는 것을 확인했다. 네 기본 변형 컴파일/매니페스트104개 구성 검사도 통과했다. 기존 Java8/구식 API/Gradle 경고는 남아 있다. Release 배포 차단은 유지하며 Release 키·제출 APK/AAB는 만들지 않았다.
+- 일반 Debug의 사설 CA 연결 거절 Android 화면 시험은 초기 HMI 창 전환 실패로 완료하지 않았으므로 통과 항목에 넣지 않는다. 일반/Release APK 리소스 누출 검사는 완료했고, 실제 Android의 아래 긍정 시험은 opt-in Debug를 사용했다. 기존 Java 상태 검사178개를 이번에 다시 실행했다고 주장하지 않는다.
+
+## 2026-11-06 — 두 실제 에뮬레이터의 로컬 HTTPS 참여·공유·종료
+
+- Pleos API34/user10의 A emulator-5554/B emulator-5556에 같은 opt-in Debug APK를 install -r했다. 양쪽 URL은 https://10.0.2.2:8443, Caddy 뒤 실제 중계는127.0.0.1:8787이다. 공식 휴대폰 앱·공인 서버·합성 HTTP 상대를 Android 참여자로 사용하지 않았다.
+- 초기 실행에서 HMI 표시/입력 불일치, 진단 Activity 태스크 재사용과 A system_server DEAD_OBJECT 응답을 관측했다. 실패 캡처/중간 그룹을 최종 연속 검증으로 계산하지 않았다. -no-snapshot/-feature -Vulkan 실행 옵션으로 재부팅했으나 모든 HMI 문제가 해결됐다고 주장하지 않는다. AVD 설정 파일은 바꾸지 않고 앱 초기화를 정리해 아래 stable 실행을 별도로 확인했다. 지도 배경 문제 해결 시험은 아니다.
+- 재부팅 후 주입 전 GPS를 양쪽 기록하고 판교 부근 서로 다른 시험 좌표를3초마다 주입했다. 실제 Debug NaviHelper 진단 경로를 사용했다. SDK가 반환한 에뮬레이터 정보이며 실차 위치/교통 ETA 정확도 시험이나 MockSharingTransport 시험은 아니다.
+- 최종 stable 실행에서 A TlsCarA 생성→B TlsCarB 참여 요청→A 승인→각자 실제 전송 범위 동의를 UI로 수행했다. 성공한 새 XML의 대기/승인/동의 단계와 양쪽 location FGS를 확인했다(two-https4-*-stable-*.xml, https4-*-stable-service.txt).
+- 양쪽 화면에서 서로의 서로 다른 좌표가 실제 HTTPS로 공유됐다(https4-a-stable-sharing.png, https4-b-stable-sharing.png). B의 수정구 시흥동 주소·진단 목적지·SDK 약7분/1.8km ETA가 A에 표시됐다. A는 내비 목적지/ETA 확인 중 상태였으며 이를 임의 값으로 채우지 않았다. 양방향 유효 ETA가 모두 확인됐다고 주장하지 않는다. 정리 때 A 내비의 '기존 경로로 안내를 계속할까요?' 재시작 확인창도 관측했으므로 A 내비 준비/SDK 상태는 별도 재현 확인 대상으로 남긴다.
+- B가 실제 UI로 '휴게소 들를게요'를 전송하고 A에서 앱 수신 확인을 보았다. A가 메시지 확인을 누른 뒤 A의 '내가 확인'과 B의 '상대가 확인'을 새 스크린샷으로 확인했다(https4-*-restarted-sharing.png). 수신과 사용자의 확인 응답을 구분했다.
+- A 공유 중지를 누르자 A FGS가 꺼지고 B FGS는 유지됐다. B 화면에서 A 위치가 제거되는 것을 확인했다(https4-*-stop-check.png/service.txt). A는 다시 공유 시작→전송 범위 동의 후 명시적으로 재개했으며 자동 재개로 설명하지 않는다.
+- 마지막 A 그룹 나가기를 누르자 두 앱 모두 그룹 미참여·내 위치 공유 중지로 바뀌고 위치/목적지/ETA·메시지가 없어졌다(two-https4-*-ended.xml/png). 양쪽 FGS 없음·공유 알림0개를 검사했다. 일부 활성 화면의 uiautomator idle 실패는 제외하고 최신 스크린샷과 서비스 기록, 종료 상태의 성공 XML을 근거로 사용했다.
+- 정리: 시험 CA가 없는 일반 standardDebug를 두 기기에 다시 install -r하고 앱을 종료했다. GPS feeder를 정확한 PID/명령행으로 종료하고 양쪽 내비 안내 종료/어디로 갈까요 화면을 확인했다. 재부팅 후 기록한 원래 GPS를 복원하고 두 AVD와 로컬 TLS/Node 프로세스를 종료했다. 두 config.ini SHA256 동일·테스트 포트 리스너 없음·실행 기기 없음도 확인했다. .gradle의 시험 TLS 개인 키/CA/캡처는 Git 제외로만 남기고 사용자 앱 권한은 유지했다. 커밋·푸시하지 않았다.
+
+## 2026-11-06 — Docker/WSL 업데이트 준비와 관리자 승인 취소
+
+- 사용자가 Docker를 직접 종료했다고 알려 주었고 업데이트 후 컨테이너 확인을 요청했다. 이전 HTTPS 작업의 미커밋 변경을 유지했다. 시작 Docker Desktop4.87.0.236836/CLI29.7.2/Compose5.4.0을 확인했으며 공식 desktop update --check-only가4.98.0을 제시했다.
+- WSL 버전 조회는 REGDB_E_CLASSNOTREG로 실패했고 설치된 Store 패키지는2.4.10.0이었다. wsl --update --web-download가 출력 없이 진행되지 않아 해당 명령으로 시작한 wsl.exe 프로세스만 대조해 종료했다. 배포판 종료/삭제·WSL unregister·OS 가상화 설정 변경은 하지 않았다.
+- Docker 공식 CLI desktop update --quiet로4.98.0을 다운로드해 설치를 시작했다. 설치 로그는 'Not run as admin, relaunching with UAC prompt' 다음 '사용자가 작업을 취소했습니다'를 기록했다. 관리자 승인 단계가 취소되어4.87.0이 유지됐고 실제 업데이트 완료로 기록하지 않는다. UAC는 자동 승인하지 않았으며 사용자에게 직접 승인이 필요함을 안내했다. 해당 업데이트 CLI의 자동 재시도를 중지하고 이번에 시작한 Docker Desktop은 종료 요청했다.
+- Microsoft/WSL 공식 최신 안정 릴리스3.0.3의 x64 MSI를 Git 제외 .gradle에 준비했다. GitHub의 SHA256 digest와 파일 해시 일치 및 Microsoft Corporation Authenticode Valid 서명을 확인했다. Docker 관리자 승인 취소 후 다른 설치를 강행하지 않아 WSL MSI도 아직 설치하지 않았다.
+- Docker가 준비되면 바로 검사할 수 있도록 compose.local.yaml/local.env.example을 추가했다. 기본 배포 설정과 합치되 !override로80/443 대신127.0.0.1:8443만 공개하고 서버 인증서/개인 키만 읽기 전용으로 넣는다. root.key는 컨테이너에도 넣지 않는다. Caddy 로컬 bind를 환경변수로 선택하게 하고 네이티브 기본127.0.0.1은 유지했다.
+- start-local-https.ps1에 -CertificatesOnly를 추가해 서비스 실행 없이 시험 인증서만 준비하도록 했다. 해당 경로 실행·인증서 검증, 로컬 Caddy validate, Compose 해석 및 루프백8443 단일 포트/relay 비공개 검사를 통과했다. 운영 가이드에 별도 donghaeng-relay-check 프로젝트로 build/up/smoke/health/down하는 명령을 추가했다.
+- 이미지 pull/build·컨테이너 구동·Docker HTTPS smoke는 관리자 설치가 완료되지 않아 아직 미검증이다. 기존 이미지/배포판/볼륨을 삭제하거나 prune하지 않았으며 에뮬레이터·APK는 이번에 변경하지 않았다. 업데이트 다운로드/로컬 설정 준비까지만 완료했고 Docker/WSL 업데이트와 엔진 검증은 사용자 관리자 승인 이후 남아 있다. 커밋·푸시하지 않았다.
+
+## 2026-11-06 — Docker 업데이트 완료 후 컨테이너 HTTPS 검증
+
+- 사용자가 직접 설치를 마쳤으며 WSL3.0.3.0/커널6.18.54.1-1과 Docker Desktop4.98.0/Engine29.9.2의 출력을 제공했다. Docker CLI에서 Linux 엔진 응답과 Compose5.6.1을 확인했다. 앞선 관리자 승인 취소 기록 이후의 후속 검증이다.
+- 별도 donghaeng-relay-check 프로젝트로 실제 이미지를 빌드하고 relay healthy 및 Caddy 실행을 확인했다. 컨테이너 Node v24.22.2/Caddy v2.11.9다. relay는 node(uid1000), 호스트 포트 없음, 두 서비스는 읽기 전용 루트·cap_drop ALL·no-new-privileges를 적용한다. 외부 공개는127.0.0.1:8443뿐이며 서버 인증서/키는 읽기 전용, root.key는 마운트하지 않았다.
+- 실제 Docker HTTPS TLS1.3 smoke를 통과했다. 신뢰되지 않은 CA·잘못된 hostname 거절, health/API 인증/본문 제한, 두 합성 클라이언트의 요청·승인·각자 동의·위치/ETA·메시지 확인·공유 중지·그룹 종료를 검증했다. 토큰이나 페이로드는 출력하지 않았다. PC API 시험이며 이번에 Android 에뮬레이터를 다시 실행한 것은 아니다.
+- relay만 중단하면 HTTPS health가502를 반환했고 다시 시작해 healthy가 된 뒤 전체 HTTPS smoke가 다시 통과했다. 운영 Caddy 설정도 실제 이미지에서 network none으로 validate를 통과했다. 공인 인증서 발급이나 외부 서버 배포는 수행하지 않았다.
+- 시험 Compose 프로젝트만 down하여 컨테이너·네트워크를 정리했다. 이미지/캐시/인증서 volume은 보존했고 전체 prune은 하지 않았다. Docker Desktop 엔진은 유지한다. 동행길 앱 소스·서명 키·제출 APK는 이번 후속 작업에서 변경/생성하지 않았다. 운영 가이드의 Docker 미검증 설명을 갱신했다. 커밋·푸시하지 않았다.

@@ -125,3 +125,7 @@ standard/submission flavor와 debug/release build type을 적용했다. `src/dem
 실제 HTTP 공유의 그룹장 역할·초대 코드 재발급/폐기·참여 승인/거절·강제 퇴장을 구현했다. [그룹 접근 기준](group-access-control.md)을 공통 기준으로 사용한다. 승인 전에는 그룹 정보가 제공되지 않으며 승인 후에도 각 차량의 명시적 위치 공유 동의가 필요하다. 실제 공유의 관리 조작은 정차·연결·역할 확인을 적용하고 주행 중 관리 목록을 숨긴다. 모의 엔진에는 이 서버 접근 제어를 적용한 것처럼 설명하지 않는다.
 
 계정/차량 소유 인증, 온라인 HTTPS 배포, 그룹장 양도, 실차·서명된 Release 실행은 여전히 후속 범위다. API accessVersion 2를 지원하는 앱/서버를 함께 사용한다. Release 키·제출 APK 차단은 유지한다.
+
+## 2026-11-06 HTTPS 배포·로컬 인증서 시험 경계
+
+HTTPS 역방향 프록시·단일 Node 프로세스 배포 설정과 운영 기준은 [HTTPS 운영 가이드](https-relay-operations.md)를 따른다. API/SharingTransport는 유지한다. 로컬 TLS 시험을 위해 `donghaengLocalTlsCa` 빌드 속성을 명시한 Debug에만 공개 CA를 추가할 수 있다. 신뢰 범위는10.0.2.2/127.0.0.1/localhost이며 다른 호스트·일반 Debug·두 Release의 신뢰는 확장하지 않는다. 개인 키는 APK/저장소에 넣지 않고 hostname 검증을 끄지 않는다. 공개 온라인 서버/공인 인증서/실차·Release 설치 검증 완료로 설명하지 않으며 실제 결과는 work-log를 따른다.

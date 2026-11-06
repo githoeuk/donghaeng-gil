@@ -92,3 +92,5 @@ SharingDemoActivity → SharingTransport ← 향후 실제 통신 어댑터
 ## 2026-11-06 실제 그룹 접근 관리
 
 실제 그룹은 생성자만 코드 재발급/폐기와 참여 승인/거절·강제 퇴장을 수행한다. 서버가 세션 소유권을 검사하며, 승인 전에는 위치·메시지를 공개하지 않는다. 그룹장 탈퇴/유휴 만료 시 전체 그룹을 종료하고 새 공유 동의를 요구한다. [세부 기준](group-access-control.md)과 [실행/API](local-relay.md)를 따른다. SharingTransport의 모의 구현과 공식 휴대폰 연동 목표는 유지하며, 공식 앱 API를 가정해 추가하지 않았다.
+
+HTTPS 배포 준비와 명시적 Debug 로컬 CA 시험은 [운영 가이드](https-relay-operations.md)를 따른다. 공인 온라인 배포 여부와 실제 기기 검증 범위는 work-log에 구분한다.
