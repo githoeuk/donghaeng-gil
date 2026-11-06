@@ -38,7 +38,7 @@ public final class GroupSharingActivity extends Activity {
         public void onServiceConnected(ComponentName component,IBinder binder){
             service=((SharingService.LocalBinder)binder).service();
             if(!service.endpoint().isEmpty()){endpoint.setText(service.endpoint());name.setText(service.vehicleName());}
-            renderedMessages="initial";service.attach(observer);
+            renderedMessages="initial";renderedManagement="initial";service.attach(observer);
         }
         public void onServiceDisconnected(ComponentName component){service=null;relay=null;updateText(status,"공유 서비스 연결이 종료됐습니다. 다시 화면을 열어 확인하세요.");}
     };
@@ -47,7 +47,8 @@ public final class GroupSharingActivity extends Activity {
     private EditText endpoint,name,code;
     private TextView safety,status,vehicles,groupHelp;
     private Button copyInvite;
-    private LinearLayout messages;
+    private LinearLayout messages, management;
+    private String renderedManagement="initial";
     private String renderedMessages="initial";
     private final List<View> parkedControls=new ArrayList<>();
     private AlertDialog consent;
@@ -71,7 +72,7 @@ public final class GroupSharingActivity extends Activity {
         LinearLayout group=row();root.addView(group);
         group.addView(parkedButton("그룹 만들기",()->{if(relay!=null)relay.createGroup();}));
         code=edit("","초대 코드");group.addView(code,new LinearLayout.LayoutParams(240,-2));parkedControls.add(code);
-        group.addView(parkedButton("그룹 참여",()->{if(relay!=null)relay.joinGroup(code.getText().toString());}));
+        group.addView(parkedButton("참여 요청",()->{if(relay!=null)relay.joinGroup(code.getText().toString());}));
         copyInvite=parkedButton("초대 코드 복사",this::copyInviteCode);parkedControls.remove(copyInvite);root.addView(copyInvite);
         group.addView(parkedButton("공유 시작",this::confirmSharing));
         group.addView(button("공유 중지",()->{if(service!=null)service.stopSharing();}));
@@ -79,6 +80,7 @@ public final class GroupSharingActivity extends Activity {
         vehicles=text("서버에서 받은 차량 정보가 없습니다.",17);root.addView(vehicles);
         LinearLayout actions=row();root.addView(actions);
         for(MessageKind kind:MessageKind.values())actions.addView(parkedButton(kind.label,()->{if(relay!=null)relay.send(kind);}));
+        management=column();root.addView(management);
         messages=column();root.addView(messages);
         root.addView(button("내 차량 화면으로",this::finish));setContentView(scroll);
         parkingSource=new VehicleParkingSource(this,parking,this::render);
@@ -148,6 +150,7 @@ public final class GroupSharingActivity extends Activity {
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
             updateText(groupHelp,"1. 두 차량 모두 같은 서버 주소로 연결하세요. 로컬 시험은 PC에서 중계 서버를 먼저 실행해야 합니다.");
             updateText(vehicles,"공유된 차량 정보가 없습니다.");
+            renderManagement(parked);
             parkedControls.removeIf(view -> view.getParent()==messages);messages.removeAllViews();renderedMessages="initial";
             return;
         }
@@ -156,13 +159,15 @@ public final class GroupSharingActivity extends Activity {
             +" · "+(snapshot.connection==Connection.CONNECTED?"서버 연결됨":"연결 끊김/요청 확인 필요")
             +" · "+(snapshot.sharing?"내 위치 공유 중":"내 위치 공유 중지")+"\n"+snapshot.notice+(service.status().isEmpty()?"":"\n"+service.status())+"\n"+relay.roster());
         boolean inGroup=!snapshot.groupId.isEmpty();
-        copyInvite.setEnabled(parked && inGroup && !snapshot.inviteCode.isEmpty()
+        copyInvite.setEnabled(parked && inGroup && relay.isGroupOwner() && !snapshot.inviteCode.isEmpty()
             && snapshot.connection==Connection.CONNECTED);
         updateText(groupHelp,snapshot.connection!=Connection.CONNECTED
             ?"서버 연결 상태를 확인하세요. 두 차량이 같은 서버에 연결되어야 참여할 수 있습니다."
-            :!inGroup
-                ?"2. 처음 시작하는 차량은 ‘그룹 만들기’를 누르세요. 참여하는 차량은 상대에게 받은 초대 코드를 입력하고 ‘그룹 참여’를 누르세요."
-                :"3. 초대 코드를 복사해 상대에게 직접 전달하세요. 상대는 같은 서버에서 코드를 입력해 참여합니다. 각 차량이 동의 후 ‘공유 시작’을 눌러야 위치가 전송됩니다. 코드는 생성 후 30분간 유효합니다.");
+            :relay.isApprovalPending()?"그룹장 승인 대기 중입니다. 취소하려면 그룹 나가기를 누르세요."
+            :!inGroup?"그룹을 만들거나 초대 코드를 입력해 참여 요청을 보내세요. 그룹장 승인이 필요합니다."
+            :relay.isGroupOwner()?"그룹장입니다. 참여 요청을 승인하세요. 그룹장이 나가면 그룹 전체가 종료됩니다. 각 차량의 공유 동의는 별도입니다."
+            :"참여가 승인됐습니다. 위치를 보내려면 공유 시작에 동의하세요. 초대 코드는 그룹장만 관리합니다.");
+        renderManagement(parked);
         long now=SystemClock.elapsedRealtime();Vehicle mine=null;
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
         StringBuilder rows=new StringBuilder();
@@ -195,6 +200,37 @@ public final class GroupSharingActivity extends Activity {
             messages.addView(text(message.sender+(own?" (나)":"")+" · "+message.kind.label+" · "+delivery,17));
             if(!own && message.delivery==Delivery.DELIVERED)messages.addView(parkedButton("메시지 확인",()->{if(relay!=null)relay.acknowledge(message.id);}));
         }
+    }
+    private void confirmManagement(String title,Runnable action){
+        if(!parking.allowed(SystemClock.elapsedRealtime()))return;
+        if(consent!=null)consent.dismiss();
+        consent=new AlertDialog.Builder(this).setTitle(title).setMessage("이 작업은 그룹 접근 권한을 변경합니다.")
+            .setNegativeButton("취소",null).setPositiveButton("확인",(dialog,which)->{
+                if(parking.allowed(SystemClock.elapsedRealtime()) && relay!=null && relay.isGroupOwner()
+                    && relay.snapshot().connection==Connection.CONNECTED)action.run();
+            }).create();consent.show();
+    }
+    private void renderManagement(boolean parked){
+        StringBuilder key=new StringBuilder(parked+":"+(relay!=null && relay.isGroupOwner()));
+        if(relay!=null){key.append(relay.snapshot().connection).append(relay.snapshot().groupId).append(relay.snapshot().inviteCode);
+            for(HttpSharingTransport.AccessPerson person:relay.joinRequests())key.append(person.id).append(person.name);
+            for(HttpSharingTransport.AccessPerson person:relay.groupMembers())key.append(person.id).append(person.name);
+        }
+        if(key.toString().equals(renderedManagement))return;
+        renderedManagement=key.toString();parkedControls.removeIf(view->view.getParent()==management);management.removeAllViews();
+        if(relay==null || !relay.isGroupOwner())return;
+        if(!parked){management.addView(text("주행·상태 미확인 중 그룹 관리는 잠깁니다.",16));return;}
+        if(relay.snapshot().connection!=Connection.CONNECTED){management.addView(text("연결을 확인한 뒤 그룹을 관리하세요.",16));return;}
+        management.addView(text("그룹장 관리 · 초대 코드 "+(relay.snapshot().inviteCode.isEmpty()?"만료/폐기됨":"유효 · 발급 후 30분"),18));
+        management.addView(parkedButton("초대 코드 재발급",()->confirmManagement("코드를 재발급하고 대기 요청을 취소할까요?",()->{if(relay!=null)relay.rotateInvite();})));
+        management.addView(parkedButton("초대 코드 폐기",()->confirmManagement("초대를 닫고 대기 요청을 취소할까요?",()->{if(relay!=null)relay.revokeInvite();})));
+        for(HttpSharingTransport.AccessPerson person:relay.joinRequests()){
+            management.addView(text("승인 대기 · "+person.name,17));
+            management.addView(parkedButton(person.name+" 참여 승인",()->{if(relay!=null)relay.decideRequest(person.id,true);}));
+            management.addView(parkedButton(person.name+" 참여 거절",()->{if(relay!=null)relay.decideRequest(person.id,false);}));
+        }
+        for(HttpSharingTransport.AccessPerson person:relay.groupMembers())if(!person.id.equals(relay.userId()))
+            management.addView(parkedButton(person.name+" 내보내기",()->confirmManagement(person.name+" 차량을 내보낼까요?",()->{if(relay!=null)relay.kickMember(person.id);})));
     }
     private static void updateText(TextView view,CharSequence value){if(!view.getText().toString().contentEquals(value))view.setText(value);}
     private EditText edit(String value,String hint){EditText input=new EditText(this);input.setSingleLine(true);input.setText(value);input.setHint(hint);input.setContentDescription(hint);input.setTextColor(Color.WHITE);input.setHintTextColor(Color.LTGRAY);return input;}

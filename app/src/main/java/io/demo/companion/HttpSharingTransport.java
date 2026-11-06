@@ -40,6 +40,21 @@ public final class HttpSharingTransport implements SharingTransport {
         if (name.trim().isEmpty() || name.length()>24) throw new IllegalArgumentException("차량 이름은 1~24자로 입력하세요.");
         this.name = name.trim(); handler.post(ticker);
     }
+    public static final class AccessPerson {
+        public final String id,name;
+        AccessPerson(String id,String name){this.id=id;this.name=name;}
+    }
+    private boolean groupOwner, approvalPending;
+    private final List<AccessPerson> joinRequests=new ArrayList<>(), groupMembers=new ArrayList<>();
+    public boolean isGroupOwner(){return groupOwner;}
+    public boolean isApprovalPending(){return approvalPending;}
+    public List<AccessPerson> joinRequests(){return new ArrayList<>(joinRequests);}
+    public List<AccessPerson> groupMembers(){return new ArrayList<>(groupMembers);}
+    private void clearAccess(){groupOwner=false;approvalPending=false;joinRequests.clear();groupMembers.clear();}
+    public void rotateInvite(){command("/v1/groups/invite/rotate",object());}
+    public void revokeInvite(){command("/v1/groups/invite/revoke",object());}
+    public void decideRequest(String id,boolean approve){command("/v1/groups/requests/"+(approve?"approve":"reject"),object("requestId",id));}
+    public void kickMember(String id){command("/v1/groups/kick",object("memberId",id));}
     public String userId() { return userId; }
     public String roster() { return roster; }
     @Override public void setListener(Listener value) { listener = value; emit(); }
@@ -138,13 +153,26 @@ public final class HttpSharingTransport implements SharingTransport {
     private void apply(JSONObject reply,String notice){
         if(sessionInvalid)return;
         try {
+            if(reply.optInt("accessVersion",0)!=2){failed(new ApiException("PROTOCOL_MISMATCH"));return;}
             String group=reply.getString("groupId");
+            clearAccess();groupOwner=userId.equals(reply.optString("ownerId",""));approvalPending=reply.optBoolean("pending",false);
+            JSONArray requests=reply.optJSONArray("requests");
+            if(requests!=null)for(int i=0;i<requests.length();i++){JSONObject r=requests.getJSONObject(i);joinRequests.add(new AccessPerson(r.getString("id"),r.getString("name")));}
+            String access=reply.optString("accessNotice","");
+            String accessText="REMOVED_FROM_GROUP".equals(access)?"그룹장이 내보냈습니다. 공유가 중지됐습니다.":
+                "GROUP_CLOSED".equals(access)?"그룹장 연결 종료로 그룹이 닫혔습니다. 새 그룹으로 참여하세요.":
+                "REQUEST_REJECTED".equals(access)?"참여 요청이 거절됐습니다.":
+                "REQUEST_EXPIRED".equals(access)?"참여 요청이 만료됐습니다. 코드를 확인해 다시 요청하세요.":
+                "INVITE_CHANGED".equals(access)?"초대 코드가 변경/폐기되어 요청이 취소됐습니다. 새 코드를 확인하세요.":
+                approvalPending?"그룹장 승인 대기 중 · 승인 전에는 차량 정보를 받거나 공유할 수 없습니다.":"";
+            if(!accessText.isEmpty())notice=accessText;
             if(group.isEmpty()){desiredSharing=false; shareEpoch="";}
             long now=SystemClock.elapsedRealtime(), wall=System.currentTimeMillis(), serverNow=reply.getLong("serverNow");
             List<Vehicle> vehicles=new ArrayList<>(); List<Message> messages=new ArrayList<>(); StringBuilder names=new StringBuilder();
             JSONArray members=reply.getJSONArray("members");
             for(int i=0;i<members.length();i++){
                 JSONObject member=members.getJSONObject(i);
+                groupMembers.add(new AccessPerson(member.getString("id"),member.getString("name")));
                 names.append(member.getString("name")).append(member.getString("id").equals(userId)?" (나)":"")
                     .append(member.getBoolean("online")?"":" · 연결 지연").append(member.getBoolean("sharing")?" · 공유 중":" · 공유 중지").append('\n');
                 JSONObject state=member.optJSONObject("state"); if(state==null)continue;
@@ -161,19 +189,26 @@ public final class HttpSharingTransport implements SharingTransport {
                     MessageKind.valueOf(message.getString("kind")),message.getLong("sentAt"),Delivery.valueOf(message.getString("delivery"))));
             }
             roster=names.toString();
-            current=new Snapshot(group,reply.getString("inviteCode"),actionNotice.isEmpty()?notice:actionNotice,desiredSharing,false,Connection.CONNECTED,vehicles,messages); emit();
+            current=new Snapshot(group,reply.getString("inviteCode"),!accessText.isEmpty()?accessText:actionNotice.isEmpty()?notice:actionNotice,desiredSharing,false,Connection.CONNECTED,vehicles,messages); emit();
         }catch(Exception error){notice("서버 데이터 형식 확인 필요",Connection.DISCONNECTED);}
     }
     private void failed(Exception error){
         final String message=error instanceof ApiException ? ((ApiException)error).code : "NETWORK_ERROR";
         handler.post(()->{
             if(closed || sessionInvalid)return;
-            if("UNAUTHORIZED".equals(message)){
+            if("UNAUTHORIZED".equals(message) || "PROTOCOL_MISMATCH".equals(message)){
+                clearAccess();
                 sessionInvalid=true;desiredSharing=false;shareEpoch="";shareRevision++;latest=null;roster="";
                 current=new Snapshot("","","서버 재시작 또는 세션 만료 · 서버 연결을 다시 누르고 새 그룹 생성/참여 후 공유에 다시 동의하세요.",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
+                if("PROTOCOL_MISMATCH".equals(message))current=new Snapshot("","","서버와 앱 버전이 다릅니다. 승인 기능을 지원하는 서버로 업데이트하세요.",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
                 emit();
+            }else if("JOIN_REQUIRED".equals(message) || "SHARING_STOPPED".equals(message)){
+                desiredSharing=false;shareEpoch="";shareRevision++;latest=null;roster="";clearAccess();
+                current=new Snapshot("","","그룹/공유 권한이 종료되어 전송을 중지했습니다.",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());emit();
+            }else if("OWNER_REQUIRED".equals(message) || "REMOVED_FROM_GROUP".equals(message) || "REQUEST_NOT_FOUND".equals(message) || "REQUEST_EXPIRED".equals(message) || "REQUEST_LIMIT".equals(message) || "CANNOT_REMOVE_OWNER".equals(message) || "MEMBER_NOT_FOUND".equals(message)){
+                actionNotice="그룹 관리 요청을 처리할 수 없습니다. 권한·요청 만료·구성원 상태를 다시 확인하세요.";notice(actionNotice,current.connection);
             }else if("INVALID_OR_EXPIRED_CODE".equals(message)){
-                actionNotice="초대 코드가 틀렸거나 만료됐습니다. 상대에게 새 그룹의 코드를 받아 다시 입력하세요.";notice(actionNotice,current.connection);
+                actionNotice="초대 코드가 틀렸거나 만료됐습니다. 그룹장에게 새 초대 코드를 받아 다시 입력하세요.";notice(actionNotice,current.connection);
             }else if("LEAVE_FIRST".equals(message)){
                 actionNotice="이미 그룹에 참여 중입니다. 다른 그룹에 참여하려면 먼저 그룹에서 나가세요.";notice(actionNotice,current.connection);
             }else if("GROUP_FULL".equals(message)){
