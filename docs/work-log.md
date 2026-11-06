@@ -447,3 +447,17 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 일부 공유 시작 직후 uiautomator는 idle 실패여서 해당 member-sharing XML은 증거로 사용하지 않았다. 공유 시작은 dumpsys FGS 관측, 퇴장 후 상태는 성공한 새 XML/서비스 기록을 근거로 한다.
 - README·local-relay·communication-plan·submission-release-guidelines를 갱신했다. 온라인 HTTPS 배포·계정/차량 소유 인증·그룹장 양도·실차·서명된 Release는 후속 범위로 남긴다. 기존 버전에서 수행한 통신 장애 시험을 새 접근 계약에서 다시 수행했다고 주장하지 않는다.
 - 시험용 fixture/캡처/초대 코드 등은 Git 제외 .gradle/access-*에만 두고 인증 토큰은 프로세스 메모리에만 유지했다. 앱 종료·FGS/알림 없음 확인, ADB8088 전달 제거, 확인한 fixture PID 종료·에뮬레이터 종료로 정리했다. 앱 권한·GPS·내비 목적지·AVD 설정·SDK는 바꾸지 않았다. diff 검사를 통과했으며 커밋·푸시하지 않았다.
+
+## 2026-11-06 — 두 실제 Pleos 에뮬레이터의 승인·개별 동의·공유·강제 퇴장 검증
+
+- 시작 시 main/origin main은 13047ae로 일치했고 작업 트리는 깨끗했다. 작업 규칙과 제출 가이드에 따라 기존 최신 standardDebug APK를 사용했다. 소스·서버 구현은 수정하지 않았으며 커밋·푸시하지 않았다.
+- 기존 Pleos_Connect_v2.1.0 외에 공식 avdmanager로 API34/Pleos 이미지의 Donghaeng_Gil_Peer를 생성했다. B 데이터는 D:\projects\avds\Donghaeng_Gil_Peer.avd에 두고 SDK는 기존 C: 설치를 공유한다. 사용자 데이터를 복제하지 않았고 기존 AVD config.ini SHA256이 전후 동일함을 확인했다. 두 기기 RAM은 각각4GB, 실행 시 코어2개로 제한했다.
+- emulator-5554(A)와 emulator-5556(B), Android user10에서 동일 APK를 실제 실행했다. 일반 relay/server.mjs를 127.0.0.1:8787에 띄우고 양쪽 앱이 10.0.2.2:8787로 접속했다. 이번 상대는 독립 HTTP 시험 클라이언트가 아니라 두 번째 Android 앱이다. 공식 휴대폰 앱이나 온라인 서버는 사용하지 않았다.
+- A가 그룹을 만들고 B가 코드로 참여 요청했다. 승인 대기 B는 차량 정보를 볼 수 없었다(two-b-pending.xml). A가 UI에서 승인한 후 양쪽 모두 공유 중지 상태이며 자동 공유하지 않음을 확인했다(two-a-approved.xml, two-b-approved.xml).
+- A·B 각각 화면의 공유 시작과 전송 범위 동의를 수행했다. 새 B에서는 위치·차량 상태 접근 및 알림 권한도 UI로 허용했다. 양쪽 location FGS isForeground=true와 알림301을 확인했다(two-a-sharing-service.txt, two-b-sharing-service.txt). 승인과 개인 동의를 분리한 동작을 확인했다.
+- 양쪽 원래 GPS를 저장한 뒤 A/B에 서로 다른 판교 부근 시험 GPS를 3초마다 주입했다. Debug 진단 목적지 경로에서 NaviHelper가 산출한 약8분/1.8km, 수정구 시흥동 주소와 목적지, 서로 다른 좌표·최근 갱신이 양쪽 실제 그룹 화면에 표시됨을 확인했다(two-a-current-sharing.png, two-b-current-sharing.png). 모의 공유 데이터를 직접 만든 시험은 아니지만, 시험 GPS·진단 목적지를 이용한 에뮬레이터 SDK/HTTP 통합 시험이다. 실차나 실제 도착 정확도 검증으로 설명하지 않는다.
+- A의 '휴게소 들를게요'와 B의 '잠시 기다려 주세요'를 각 앱 UI로 전송했다. 양쪽 앱 수신 확인을 관찰하고 받은 기기에서 메시지 확인을 각각 눌렀다. A 화면의 상대가 확인(two-a-ack-ready.png), B 화면의 내가 확인 및 자기 메시지 상대가 확인(two-b-both-acknowledged.png)을 확인했다. 수신 확인과 사용자의 확인 응답을 구분했다.
+- A에서 VehicleB 내보내기 확인창을 거쳐 퇴장시켰다(two-a-kick-dialog.xml). B에 그룹장 퇴장·공유 중지·그룹 미참여 안내가 나오고 위치/목적지/ETA가 없음을 XML로 검사했다(two-b-removed.xml/png). B의 FGS와 공유 알림 수0을 확인했다. A는 FGS를 유지하고 B 위치는 목록에서 사라졌다(two-a-after-kick.png, two-a-after-kick-service.txt). 로컬 요약 검사를 two-summary.json에 남겼다.
+- 활성 공유 화면은 1초 갱신 때문에 일부 uiautomator idle 검사에 실패했다. 실패한 XML은 증거로 사용하지 않고 새 스크린샷을 직접 확인했다. 승인 대기/승인 후/퇴장 후는 성공한 새 XML, 공유 수명은 dumpsys로 교차 확인했다. 이번 범위에서 기능 결함은 발견하지 않아 앱·서버 수정이나 불필요한 재빌드는 하지 않았다. 기존 단위/구성/서버 테스트를 이번에 재실행했다고 주장하지 않는다.
+- 증거는 Git 제외 .gradle/two-*에만 보관하며 공개 문서에 인증 토큰·실제 초대 코드를 넣지 않았다. 시험 GPS feeder를 정확한 PID/명령행으로 종료하고 양쪽 앱 종료·FGS 없음, 내비의 '어디로 갈까요?'로 시험 경로 종료를 확인했다. 양쪽 원래 GPS를 복원하고 두 에뮬레이터에 emu kill을 보냈으며 정확한 중계 PID를 종료했다. 새 B AVD와 Debug 설치/허용 권한은 다음 직접 실행을 위해 유지했다.
+- docs/two-emulator-guide.md에 Device Manager/PowerShell 실행, 각 기기 지정 설치, 승인·개별 동의·메시지·퇴장 확인과 종료 방법을 작성하고 local-relay에서 연결했다. 기존 지도 배경 문제, 실차, 온라인 HTTPS, 서명된 Release는 이번 검증에 포함하지 않았다.
