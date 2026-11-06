@@ -12,23 +12,44 @@ const text = (value, max) => typeof value === 'string' && value.trim().length > 
 export function createRelay({clock = Date.now} = {}) {
   const sessions = new Map(), groups = new Map(), buckets = new Map();
   const now = () => clock();
-  function removeMember(session) {
+  function removeMember(session, reason = "") {
     const group = groups.get(session.groupId);
     if (group) {
-      group.members.delete(session.id);
+      if (group.ownerId === session.id) {
+        groups.delete(group.id);
+        for (const candidate of [...group.members.values(), ...[...group.pending.values()].map(r=>r.session)]) {
+          candidate.groupId=null; candidate.pendingGroupId=null; candidate.sharing=false; candidate.state=null; candidate.epoch=null; candidate.accessNotice="GROUP_CLOSED";
+        }
+      } else {
+        group.members.delete(session.id);
+        group.messages=group.messages.filter(m=>m.senderId!==session.id);
+        for(const m of group.messages){m.received.delete(session.id);m.acked.delete(session.id);}
+      }
       if (!group.members.size) groups.delete(group.id);
     }
+    cancelPending(session, reason);
     session.groupId = null; session.sharing = false; session.state = null; session.epoch = null;
+    if(reason)session.accessNotice=reason;
   }
+  function cancelPending(session,reason="") {
+    const g=groups.get(session.pendingGroupId);if(g)g.pending.delete(session.id);
+    session.pendingGroupId=null;if(reason)session.accessNotice=reason;
+  }
+  function clearPending(group,reason){for(const r of group.pending.values()){r.session.pendingGroupId=null;r.session.accessNotice=reason;}group.pending.clear();}
+  function freshCode(){let code;do{code=randomBytes(5).toString("hex").toUpperCase();}while([...groups.values()].some(g=>g.code===code));return code;}
+  function owner(session){const g=member(session);check(g.ownerId===session.id,403,"OWNER_REQUIRED");return g;}
   function prune() {
     const at = now();
     for (const [key, entry] of buckets) if (at - entry.at > 60000) buckets.delete(key);
     for (const [key, session] of sessions) {
       if (session.groupId && at - session.lastSeen > 60000) removeMember(session);
       if (session.state && at - session.state.receivedAt > 60000) session.state = null;
-      if (at - session.createdAt > 7200000) { removeMember(session); sessions.delete(key); }
+      if (at - session.createdAt > 7200000) { removeMember(session,"SESSION_EXPIRED"); sessions.delete(key); }
     }
-    for (const group of groups.values()) group.messages = group.messages.filter(message => at - message.sentAt < 1800000);
+    for (const group of groups.values()) {
+      group.messages = group.messages.filter(message => at - message.sentAt < 1800000);
+      for(const r of [...group.pending.values()])if(at-r.createdAt>=300000 || at>=group.codeExpiresAt || at-r.session.lastSeen>60000)cancelPending(r.session,"REQUEST_EXPIRED");
+    }
   }
   function rate(key, limit) {
     if (!buckets.has(key) && buckets.size > 1000) throw new ApiError(503, 'BUSY');
@@ -42,7 +63,7 @@ export function createRelay({clock = Date.now} = {}) {
   }
   function snapshot(session) {
     const group = session.groupId ? member(session) : null;
-    if (!group) return {serverNow: now(), userId: session.id, groupId: '', inviteCode: '', members: [], messages: []};
+    if (!group) return {accessVersion:2,serverNow: now(), userId: session.id, groupId: '', inviteCode: '', ownerId:'', inviteExpiresAt:0, pending:!!session.pendingGroupId, requestId:groups.get(session.pendingGroupId)?.pending.get(session.id)?.id||"", accessNotice:session.accessNotice||'', requests:[], members: [], messages: []};
     const members = [...group.members.values()].map(s => ({id: s.id, name: s.name,
       sharing: s.sharing, online: now() - s.lastSeen <= 15000,
       state: s.state ? {...s.state.data, sourceAgeMs: s.state.age + Math.max(0,now() - s.state.receivedAt)} : null}));
@@ -51,7 +72,9 @@ export function createRelay({clock = Date.now} = {}) {
       delivery: m.senderId === session.id
         ? (m.acked.size ? 'ACKNOWLEDGED' : m.received.size ? 'DELIVERED' : 'PENDING')
         : (m.acked.has(session.id) ? 'ACKNOWLEDGED' : m.received.has(session.id) ? 'DELIVERED' : 'PENDING')}));
-    return {serverNow: now(), userId: session.id, groupId: group.id, inviteCode: group.code, members, messages};
+    return {accessVersion:2,serverNow: now(), userId: session.id, groupId: group.id, ownerId:group.ownerId,
+      inviteCode:session.id===group.ownerId && now()<group.codeExpiresAt ? group.code : "", inviteExpiresAt:session.id===group.ownerId?group.codeExpiresAt:0, pending:false, accessNotice:session.accessNotice||"",
+      requests:session.id===group.ownerId?[...group.pending.values()].map(r=>({id:r.id,name:r.session.name})):[], members, messages};
   }
   async function readBody(req) {
     check((req.headers['content-type'] || '').split(';')[0] === 'application/json',415,'JSON_REQUIRED');
@@ -80,27 +103,41 @@ export function createRelay({clock = Date.now} = {}) {
     res.setHeader('X-Content-Type-Options','nosniff');
     try {
       prune(); const path = req.url; const method = req.method;
-      if (method === 'GET' && path === '/health') { res.end(JSON.stringify({ok:true,apiVersion:1})); return; }
+      if (method === 'GET' && path === '/health') { res.end(JSON.stringify({ok:true,apiVersion:2})); return; }
       const body = method === 'GET' ? null : await readBody(req);
       if (method === 'POST' && path === '/v1/sessions') {
         rate('sessions:' + req.socket.remoteAddress,30); check(sessions.size < 100,503,'BUSY');
         check(text(body.name,24),400,'BAD_NAME');
-        const bearer = token(), session = {id:randomUUID(),name:body.name.trim(),createdAt:now(),lastSeen:now(),groupId:null,sharing:false,state:null,sequence:0,epoch:null};
+        const bearer = token(), session = {id:randomUUID(),name:body.name.trim(),createdAt:now(),lastSeen:now(),groupId:null,pendingGroupId:null,accessNotice:"",sharing:false,state:null,sequence:0,epoch:null};
         sessions.set(bearer,session); res.statusCode=201; res.end(JSON.stringify({token:bearer,userId:session.id})); return;
       }
       const bearer = (req.headers.authorization || '').replace(/^Bearer /,''); const session = sessions.get(bearer);
       check(session,401,'UNAUTHORIZED'); session.lastSeen = now(); rate('requests:' + session.id,300);
       if (method === 'POST' && path === '/v1/groups') {
-        rate('create:' + session.id,10); check(!session.groupId,409,'LEAVE_FIRST'); check(groups.size < 50,503,'BUSY');
-        let code; do { code = randomBytes(5).toString('hex').toUpperCase(); } while ([...groups.values()].some(g => g.code === code));
-        const group = {id:randomUUID(),code,createdAt:now(),members:new Map(),messages:[]};
-        groups.set(group.id,group); group.members.set(session.id,session); session.groupId=group.id;
+        rate('create:' + session.id,10); check(!session.groupId && !session.pendingGroupId,409,'LEAVE_FIRST'); check(groups.size < 50,503,'BUSY');
+        const group = {id:randomUUID(),code:freshCode(),codeExpiresAt:now()+1800000,ownerId:session.id,members:new Map(),pending:new Map(),blocked:new Set(),messages:[]};
+        groups.set(group.id,group); group.members.set(session.id,session); session.groupId=group.id;session.accessNotice="";
       } else if (method === 'POST' && path === '/v1/groups/join') {
         rate('join:' + req.socket.remoteAddress,15); check(!session.groupId,409,'LEAVE_FIRST');
         check(typeof body.code === 'string',400,'BAD_CODE');
-        const group = [...groups.values()].find(g => g.code === body.code.toUpperCase() && now()-g.createdAt < 1800000);
-        check(group,404,'INVALID_OR_EXPIRED_CODE'); check(group.members.size < 8,409,'GROUP_FULL');
-        group.members.set(session.id,session); session.groupId=group.id;
+        const group = [...groups.values()].find(g => g.code === body.code.toUpperCase() && now()<g.codeExpiresAt);
+        check(group,404,'INVALID_OR_EXPIRED_CODE');check(!group.blocked.has(session.id),403,'REMOVED_FROM_GROUP');
+        check(!session.pendingGroupId || session.pendingGroupId===group.id,409,'LEAVE_FIRST');
+        check(group.members.size<8,409,'GROUP_FULL');
+        if(!group.pending.has(session.id)){check(group.pending.size<10,429,'REQUEST_LIMIT');group.pending.set(session.id,{id:randomUUID(),session,createdAt:now()});}
+        session.pendingGroupId=group.id;session.accessNotice="";
+      } else if (method === 'POST' && (path === '/v1/groups/invite/rotate' || path === '/v1/groups/invite/revoke')) {
+        const group=owner(session);rate('manage:'+session.id,30);clearPending(group,'INVITE_CHANGED');
+        group.code=path.endsWith('/rotate')?freshCode():'';group.codeExpiresAt=group.code?now()+1800000:0;
+      } else if (method === 'POST' && (path === '/v1/groups/requests/approve' || path === '/v1/groups/requests/reject')) {
+        const group=owner(session);rate('manage:'+session.id,30);check(typeof body.requestId==='string',400,'BAD_REQUEST');
+        const request=[...group.pending.values()].find(r=>r.id===body.requestId);check(request,404,'REQUEST_NOT_FOUND');
+        if(path.endsWith('/approve')){check(now()<group.codeExpiresAt && now()-request.createdAt<300000,409,'REQUEST_EXPIRED');check(group.members.size<8,409,'GROUP_FULL');
+          group.pending.delete(request.session.id);request.session.pendingGroupId=null;request.session.groupId=group.id;request.session.accessNotice="APPROVED";group.members.set(request.session.id,request.session);
+        }else cancelPending(request.session,'REQUEST_REJECTED');
+      } else if (method === 'POST' && path === '/v1/groups/kick') {
+        const group=owner(session);rate('manage:'+session.id,30);check(body.memberId!==session.id,409,'CANNOT_REMOVE_OWNER');
+        const target=group.members.get(body.memberId);check(target,404,'MEMBER_NOT_FOUND');group.blocked.add(target.id);removeMember(target,'REMOVED_FROM_GROUP');
       } else if (method === 'POST' && path === '/v1/groups/leave') {
         removeMember(session);
       } else if (method === 'POST' && path === '/v1/sharing') {
