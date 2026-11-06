@@ -461,3 +461,13 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 활성 공유 화면은 1초 갱신 때문에 일부 uiautomator idle 검사에 실패했다. 실패한 XML은 증거로 사용하지 않고 새 스크린샷을 직접 확인했다. 승인 대기/승인 후/퇴장 후는 성공한 새 XML, 공유 수명은 dumpsys로 교차 확인했다. 이번 범위에서 기능 결함은 발견하지 않아 앱·서버 수정이나 불필요한 재빌드는 하지 않았다. 기존 단위/구성/서버 테스트를 이번에 재실행했다고 주장하지 않는다.
 - 증거는 Git 제외 .gradle/two-*에만 보관하며 공개 문서에 인증 토큰·실제 초대 코드를 넣지 않았다. 시험 GPS feeder를 정확한 PID/명령행으로 종료하고 양쪽 앱 종료·FGS 없음, 내비의 '어디로 갈까요?'로 시험 경로 종료를 확인했다. 양쪽 원래 GPS를 복원하고 두 에뮬레이터에 emu kill을 보냈으며 정확한 중계 PID를 종료했다. 새 B AVD와 Debug 설치/허용 권한은 다음 직접 실행을 위해 유지했다.
 - docs/two-emulator-guide.md에 Device Manager/PowerShell 실행, 각 기기 지정 설치, 승인·개별 동의·메시지·퇴장 확인과 종료 방법을 작성하고 local-relay에서 연결했다. 기존 지도 배경 문제, 실차, 온라인 HTTPS, 서명된 Release는 이번 검증에 포함하지 않았다.
+
+## 2026-11-06 — 두 에뮬레이터 승인 대기 중 코드 재발급·폐기 검증
+
+- main/origin main f30c04b, 작업 트리 깨끗한 상태에서 시작했다. D:\projects와 저장소 작업 규칙, 제출 가이드·통신 계획·그룹 접근 기준을 읽었다. 기존 최신 standardDebug를 Pleos API34/user10의 Pleos_Connect_v2.1.0(A, emulator-5554)와 Donghaeng_Gil_Peer(B, emulator-5556)에서 실행했다. 코드 수정·커밋·푸시는 하지 않았다.
+- 일반 createRelay()를 사용하는 실제 메모리 중계8787 앞에 기기별 로컬 프록시8788(A)/8789(B)를 뒀다. 프록시는 응답을 변경하지 않으며 통신 장애 주입과 인증 토큰/초대 코드 없는 응답 요약 관측만 한다. 합성 참여자나 테스트용 서버 API/시계는 사용하지 않았다. fixture·관측 자료는 Git 제외 .gradle/access2-*와 .gradle/two-access2-*에만 둔다.
+- 두 앱 UI로 A 그룹 생성→B 참여 요청을 수행했다. A가 재발급 확인창을 확정하자 새 코드가 발급되고 대기 목록이 비었다. B는 다음 폴링에서 '초대 코드가 변경/폐기되어 요청이 취소됐습니다. 새 코드를 확인하세요.' 및 그룹 미참여로 바뀌었다(two-access2-a-rotated.xml, two-access2-b-invalidated.xml). B에서 예전 코드로 다시 요청하면 HTTP404/INVALID_OR_EXPIRED_CODE로 거절됐다.
+- B가 새 코드로 재신청한 뒤 A가 폐기 확인창을 확정했다. A는 코드 만료/폐기됨·복사 비활성·대기 목록 비어 있음, B는 요청 취소·그룹 미참여가 됐다(two-access2-a-revoked.xml, two-access2-b-revoked.xml). 폐기 코드 재신청도 HTTP404였다. 폐기 상태에서는 새 코드가 저절로 만들어지지 않았다.
+- A에서 다시 재발급한 코드로 B가 재신청하고 A가 승인했다(two-access2-b-pending3.xml, two-access2-a-approved.xml, two-access2-b-approved.xml). 신청마다 요청 ID가 달랐고, 코드 변경 응답의 A 요청 목록0개 및 B pending=false/group 없음/members·messages0개를 실제 프록시 응답 요약으로 대조했다. 이전 요청 ID를 직접 재전송하는 시험은 이번 UI 시험에 포함하지 않았으며 기존 서버 자동 검사와 구분한다.
+- 세 번의 대기 화면과 두 번의 취소 화면에서 위치·진단 목적지·ETA가 없음을 XML로 검사했다. 최종 승인 직후 실제 서버 구성원은2명이고 양쪽 sharing=false였다. access2-check-access.mjs 로컬 검사를 통과했다. 이번 범위에서 보완할 기능 결함은 발견하지 않았다.
+- 에뮬레이터 부팅 직후 A 앱이 내비 아래의 잘못된 창 위치에 뜬 상태는 내비 초기화 후 앱 강제 종료·재실행으로 정상화했다. 실제 공유 장애 시험은 내비 초기화·진단 경로 준비를 먼저 마친 별도 새 그룹에서 진행했다. 공유 시작 전 그룹 화면 이탈 시 비활성 서비스가 연결을 닫는 기존 수명과, 공유 중 백그라운드 유지를 혼동하지 않는다.
