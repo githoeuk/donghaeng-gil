@@ -687,3 +687,10 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - **지도 배경 미복구.** 시연용 AVD의 Wi-Fi와 가상 LTE가 모두 Android VALIDATED 상태였으며 글로벌 HTTP 프록시는 설정되어 있지 않았다. 기본 내비 프로세스 로그에서 AuthComplete·NaviEngineComplete·MapComplete와 `connect_empty`를 확인했다. 집계한 DNS/TLS/타임아웃 및 HTTP 401·403·429·503 문자열은 관측되지 않았다. 공개 스타일 재조회 결과도 coastline source와 background/fill/slot/slot만 포함했다. 새 경로 계산과 배경 지도는 별도로 동작하는 것으로 관찰됐으며, 기본 내비가 도로·건물·지명 레이어를 어떤 조건에서 추가하는지는 확인하지 못했다.
 - [공식 SDK 이미지 목록](https://nexus-playground.pleos.ai/repository/raw-releases/connect-avd/2.x/crp-sys-img.xml)에 리비전 2가 표시되어 공식 ZIP을 내려받아 배포 SHA-1과 대조했다. ZIP 내부 `source.properties`는 리비전 1이며 설치본과 `system.img`, `vendor.img`, `userdata.img`, 커널, 램디스크, 빌드·기능 메타데이터의 SHA-256이 일치했다. 이 ZIP으로 만든 별도 AVD에서도 배경이 비었다. [공식 릴리스 노트](https://document.pleos.ai/en/docs/pleos-only/release-note/emulator-release-note)에서 이 현상의 수정 안내를 찾지 못했다.
 - 시연에서는 Pleos 내비가 준비된 뒤 검증한 검색어로 목적지를 지정하고 경로 안내를 시작할 수 있다. 지도 배경은 기존 Pleos 문의에서 도로 레이어 활성화 조건이나 다른 이미지 제공 여부를 확인할 항목으로 남겼다. 앱 코드와 기존 AVD 설정은 수정하지 않았다. 캡처 및 로그 집계는 Git 제외 `.gradle/map-recheck-*`에 저장했다. 핵심 증거는 `ready.png`, `starbucks-result.png`, `new-guidance.png`, `restaurants.png`, `fresh-ready.png`, `fresh-search-result.png`, `log-summary.json`이다.
+
+## 2026-11-08 — 시연용 에뮬레이터의 GPS와 내비 위치 비교
+
+- 시연용 `Pleos_Connect_v2.1.0` AVD에서 기존 Debug 진단 화면으로 Android `LocationManager.GPS_PROVIDER`와 `NaviHelper.getCurrentLocationInfo()`를 한 실행에서 비교했다. 판교 시험 좌표 A(37.4127212, 127.094681)에서 B(37.411000, 127.104000)로 바꾸자 첫 B GPS 콜백이 전환 기록 약 0.32초 뒤 도착했다. Android 시스템도 B를 마지막 GPS 위치로 보고했다. ±5m는 에뮬레이터가 보고한 정확도다.
+- Pleos NaviHelper는 A에서 ‘수정구 시흥동’을 반환했다. B의 GPS 수신 후에도 약 12초 동안 네 번의 응답이 A 좌표와 같은 주소였다. 이 시험은 경로 안내를 시작하지 않은 상태에서 수행했다. 내비의 위치 갱신이 지연된 이유와 빈 지도 배경과의 관계는 확인하지 못했다.
+- 동행길 메인 화면은 B에서 GPS가 ‘0초 전 갱신’이어도 ‘주소 확인 대기’를 표시했다. A로 되돌리자 ‘수정구 시흥동’이 표시됐다. 시연에서 현재 주소까지 표시하려면 에뮬레이터 시험 GPS를 내비 기준점과 맞추고 촬영 전에 주소 카드를 확인한다. 실차 GPS 정확도 검증은 별도다.
+- 증거는 Git 제외 `.gradle/gps-recheck-probe.log`, `.gradle/map-recheck-gps-mismatch.{xml,png}`, `.gradle/map-recheck-gps-aligned.{xml,png}`에 저장했다. 시험 전 GPS 좌표를 다시 입력했고 시스템 보고 위치가 기존과 약 0.3m 이내인 것을 확인한 뒤 AVD를 종료했다. 앱 소스·AVD 설정 변경 없이 작업 기록만 갱신했다.
