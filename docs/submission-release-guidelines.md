@@ -1,6 +1,6 @@
 # 제출용 Release 작업 가이드라인
 
-기준일: 2026-11-04 (한국 시간) / 상태: 빌드 변형·공유 소스셋 분리 및 컴파일 검증 완료. 실제 정차 판별 연결·Debug 전환 시험 완료. 서명·제출 APK 및 Release 런타임 검증 전.
+기준일: 2026-11-04 (한국 시간) / 상태: 빌드 변형·공유 소스셋 분리 및 컴파일 검증 완료. 실제 정차 판별 연결·Debug 전환 시험 완료. 임시 검증 키로 Release 설치·런타임 검증 완료. 최종 제출 서명은 팀명 확정 후 진행.
 
 이 문서는 동행길의 제출용 APK와 시연 범위를 판단하는 공통 기준이다. 기능·빌드·권한·시연 관련 작업 전에 읽고, 변경한 범위와 검증 결과는 `docs/work-log.md`에 남긴다. 현재 코드가 이 문서의 모든 기준을 이미 충족하는 것은 아니다.
 
@@ -52,7 +52,7 @@
 
 ## 4. 빌드 구성 기준과 적용 상태
 
-standard/submission flavor와 debug/release build type을 적용했다. `src/demo`에는 모의 UI·엔진·비공개 Activity 선언만 두고, Debug와 submissionRelease에서만 공유한다. 네 변형의 컴파일·매니페스트와 104개 구성 검사를 통과했다. **실제 그룹 설정의 속도·기어·UX 상태 게이트는 모든 변형에 적용한다. 모의 시연 게이트는 모의 기능이 있는 Debug와 submissionRelease에 공통 적용했다. 서명된 APK나 Release 런타임 시험은 아직 없다.**
+standard/submission flavor와 debug/release build type을 적용했다. `src/demo`에는 모의 UI·엔진·비공개 Activity 선언만 두고, Debug와 submissionRelease에서만 공유한다. 네 변형의 컴파일·매니페스트와 104개 구성 검사를 통과했다. **실제 그룹 설정의 속도·기어·UX 상태 게이트는 모든 변형에 적용한다. 모의 시연 게이트는 모의 기능이 있는 Debug와 submissionRelease에 공통 적용했다. 임시 검증 키로 서명한 submissionRelease의 에뮬레이터 런타임을 확인했다.**
 
 - 제출 변형은 `submissionRelease`로 구성한다. Release build type을 사용하고 debuggable=false로 설정한다.
 - 일반 실행용 `standardRelease`는 모의 시연 진입점·모의 구현을 포함하지 않는다. 제출용과 일반용 차이는 빌드 시 결정한다.
@@ -60,7 +60,7 @@ standard/submission flavor와 debug/release build type을 적용했다. `src/dem
 - 시연 포함 여부는 BuildConfig.DEBUG와 별도인 명시적 빌드 설정으로 관리한다. Release의 DEBUG 값을 켜서 우회하지 않는다.
 - SDK 진단·알림 시험은 계속 Debug 전용이다. 제출 시연 Activity는 앱 내부에서만 열고 exported=false로 한다. DUMP 권한을 요구하는 셸 테스트 진입점에 의존하지 않는다.
 - 같은 앱을 업데이트하는 submissionRelease의 applicationId는 현재 `io.demo.companion`을 유지한다. 별도 테스트 패키지가 필요하면 그 목적과 설치 방법을 먼저 정한다.
-- flavor 적용 시 기존 assembleDebug/assembleRelease가 여러 변형을 만들 수 있으므로 빌드 스크립트 호출·README·APK 선택 검증을 함께 갱신한다. 현재 사용 가능한 명령과 아직 없는 assembleSubmissionRelease를 혼동하지 않는다.
+- flavor 적용 시 기존 assembleDebug/assembleRelease가 여러 변형을 만들 수 있으므로 빌드 스크립트 호출·README·APK 선택 검증을 함께 갱신한다. 제출 변형은 assembleSubmissionRelease로 빌드한다.
 - 두 변형을 동시에 설치하는 시연은 이번 기본 구성에 포함하지 않는다. Debug와 Release 서명이 달라 기존 앱 위에 설치가 실패하면 전용 깨끗한 테스트 에뮬레이터에서 검증한다. 사용자 앱을 임의로 삭제하지 않는다.
 
 ## 5. 주행 안전 기준
@@ -81,7 +81,7 @@ standard/submission flavor와 debug/release build type을 적용했다. `src/dem
 - Gradle은 사용자 환경변수 또는 Git 제외된 로컬 서명 설정에서 값을 읽는다. 비밀번호를 build.gradle·README·로그·명령행 인자에 직접 넣지 않는다.
 - 필요한 서명 값이 없으면 해당 Release 빌드를 명확히 실패시킨다. unsigned APK나 Debug 서명으로 조용히 대체하지 않는다.
 - keystore, 비밀번호 파일, 서비스 계정 키는 Git·APK·공유 문서에 포함하지 않는다. 공개 가능한 인증서 지문과 APK SHA-256만 검증 기록에 남긴다.
-- 현재는 `verifyReleaseDistributionConfigured`가 모든 Release APK/AAB 패키징을 실패시킨다. 컴파일·매니페스트 검증은 가능하며, 후속 서명 작업에서 이 차단을 실제 서명·준비 상태 검증으로 교체한다. 임의 우회 옵션이나 Debug 서명 fallback은 제공하지 않는다.
+- Release 패키징은 `verifyReleaseDistributionConfigured`에서 명시적인 서명 설정과 키 파일 존재 여부를 확인한다. 실제 키와 암호 검증은 Android 빌드 도구가 수행한다. 컴파일·매니페스트 검증은 서명 없이 실행할 수 있다.
 - 서명 검증과 실제 설치·실행 검증은 별도다. 도구의 서명 검사 성공만으로 제출 준비 완료라고 하지 않는다.
 
 ## 7. 산출물과 완료 조건
@@ -124,8 +124,15 @@ standard/submission flavor와 debug/release build type을 적용했다. `src/dem
 
 실제 HTTP 공유의 그룹장 역할·초대 코드 재발급/폐기·참여 승인/거절·강제 퇴장을 구현했다. [그룹 접근 기준](group-access-control.md)을 공통 기준으로 사용한다. 승인 전에는 그룹 정보가 제공되지 않으며 승인 후에도 각 차량의 명시적 위치 공유 동의가 필요하다. 실제 공유의 관리 조작은 정차·연결·역할 확인을 적용하고 주행 중 관리 목록을 숨긴다. 모의 엔진에는 이 서버 접근 제어를 적용한 것처럼 설명하지 않는다.
 
-계정/차량 소유 인증, 온라인 HTTPS 배포, 그룹장 양도, 실차·서명된 Release 실행은 여전히 후속 범위다. API accessVersion 2를 지원하는 앱/서버를 함께 사용한다. Release 키·제출 APK 차단은 유지한다.
+계정/차량 소유 인증, 온라인 HTTPS 배포, 그룹장 양도, 실차·최종 제출 키로 서명한 APK 실행은 후속 범위다. API accessVersion 2를 지원하는 앱/서버를 함께 사용한다.
 
 ## 2026-11-06 HTTPS 배포·로컬 인증서 시험 경계
 
 HTTPS 역방향 프록시·단일 Node 프로세스 배포 설정과 운영 기준은 [HTTPS 운영 가이드](https-relay-operations.md)를 따른다. API/SharingTransport는 유지한다. 로컬 TLS 시험을 위해 `donghaengLocalTlsCa` 빌드 속성을 명시한 Debug에만 공개 CA를 추가할 수 있다. 신뢰 범위는10.0.2.2/127.0.0.1/localhost이며 다른 호스트·일반 Debug·두 Release의 신뢰는 확장하지 않는다. 개인 키는 APK/저장소에 넣지 않고 hostname 검증을 끄지 않는다. 공개 온라인 서버/공인 인증서/실차·Release 설치 검증 완료로 설명하지 않으며 실제 결과는 work-log를 따른다.
+
+## 제출 서명 준비와 검증용 APK
+
+- 팀명은 사용자 확인에 따라 미정으로 두었다. 확정 후 파일명에 반영한다.
+- 최종 키는 Git 저장소와 동기화 폴더 밖의 접근 제한된 사용자 폴더에 PKCS#12로 보관한다. 암호화된 백업 사본을 별도 장치에 두고 암호는 비밀번호 관리자에 보관한다. 업데이트 때 같은 키와 alias를 사용한다.
+- 서명할 PowerShell 세션에 `DONGHAENG_RELEASE_STORE_FILE`, `DONGHAENG_RELEASE_STORE_PASSWORD`, `DONGHAENG_RELEASE_KEY_ALIAS`, `DONGHAENG_RELEASE_KEY_PASSWORD`를 설정한 뒤 프로젝트 빌드 스크립트에 `assembleSubmissionRelease`를 전달한다. 암호는 명령 기록이나 파일에 남기지 않는 방식으로 입력한다. 빌드 후 세션에서 값을 제거한다.
+- 초기 실행 검증은 별도 키로 서명한 APK를 전용 Pleos AVD에 설치해 수행했다. 최종 제출 키가 준비되면 그 키로 다시 빌드하고, 최종 파일의 인증서 지문·SHA-256과 설치 결과를 기록한다.
