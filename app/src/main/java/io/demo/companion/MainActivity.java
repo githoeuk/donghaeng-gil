@@ -27,11 +27,12 @@ public class MainActivity extends Activity {
     private VehicleParkingSource parkingSource;
     static java.util.function.Supplier<SharingModels.Snapshot> demoOverview;
     static java.util.function.Consumer<SharingModels.MessageKind> demoSend;
+    static Runnable demoReset;
     private LinearLayout demoQuickMessages;
     private TextView parkingLabel, demoStatus, demoVehicles;
     private LinearLayout demoCard;
-    private Button demoButton, groupButton, vehiclePermission;
-    private AlertDialog demoIntro;
+    private Button demoButton, demoEndButton, groupButton, vehiclePermission;
+    private AlertDialog demoEndConfirmation;
     private final JourneyState state = new JourneyState();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PleosJourneySource source;
@@ -52,8 +53,13 @@ public class MainActivity extends Activity {
         TextView brand = text("동행길", 32, Color.WHITE); brand.setTypeface(null, Typeface.BOLD);
         root.addView(brand);
         root.addView(text("따로 출발해도, 함께 도착하다", 17, Color.rgb(156, 178, 192)));
+        TextView vehicleHeading = text("내 차량 정보", 24, Color.WHITE);
+        vehicleHeading.setTypeface(null, Typeface.BOLD);
+        vehicleHeading.setPadding(0, dp(18), 0, 0);
+        root.addView(vehicleHeading);
         connection = text("Pleos 연결 중", 16, Color.rgb(101, 222, 201));
-        connection.setPadding(0, dp(16), 0, dp(18)); root.addView(connection);
+        connection.setPadding(0, dp(4), 0, dp(10));
+        root.addView(connection);
 
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         root.addView(row, new LinearLayout.LayoutParams(-1, -2));
@@ -74,25 +80,39 @@ public class MainActivity extends Activity {
         root.addView(etaCard, etaLayout);
         eta = text("연결 중", 36, Color.rgb(101, 222, 201)); eta.setTypeface(null, Typeface.BOLD); etaCard.addView(eta);
         etaDetail = text("", 18, Color.rgb(188, 206, 217)); etaCard.addView(etaDetail);
-        TextView note = text("내 차량의 위치와 목적지입니다. 함께 가는 차량과 공유하려면 아래 버튼을 누르세요.", 15, Color.rgb(156, 178, 192));
-        note.setPadding(0, dp(18), 0, dp(8)); root.addView(note);
         LinearLayout actions = new LinearLayout(this);
+        groupButton = button("실제 동행 공유", () -> startActivity(new Intent(this, GroupSharingActivity.class)));
+        groupButton.setEnabled(false);
+        actions.addView(groupButton);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
-        {
-            parkingLabel = text("차량 상태 확인 중", 16, Color.rgb(169, 190, 203)); root.addView(parkingLabel);
-            vehiclePermission = button("차량 상태 접근 허용", () -> requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, VEHICLE_REQUEST)); root.addView(vehiclePermission);
-            groupButton = button("동행 차량과 공유", () -> startActivity(new Intent(this, GroupSharingActivity.class))); groupButton.setEnabled(false); actions.addView(groupButton);
-            if (BuildConfig.HAS_SHARING_DEMO) { demoButton = button("가상 차량으로 체험 (정차 중)", this::showDemoIntro); demoButton.setEnabled(false); actions.addView(demoButton); }
-        }
         if (BuildConfig.DEBUG) {
             actions.addView(button("알림 시험", () -> startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".NotificationDemoActivity"))));
         }
         root.addView(actions);
+        parkingLabel = text("차량 상태 확인 중", 16, Color.rgb(169, 190, 203));
+        root.addView(parkingLabel);
+        vehiclePermission = button("차량 상태 접근 허용", () -> requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, VEHICLE_REQUEST));
+        root.addView(vehiclePermission);
         if (BuildConfig.HAS_SHARING_DEMO) {
-            demoCard = card("가상 체험 · 팀원 상황");
+            demoCard = card("가상 체험", Color.rgb(37, 34, 59));
+            demoCard.addView(text("가상 팀원의 위치·도착 시간·메시지를 체험할 수 있어요. 체험 데이터는 외부로 보내지 않습니다.",
+                    17, Color.rgb(207, 198, 233)));
             demoStatus = text("", 18, Color.WHITE);
-            demoVehicles = text("", 16, Color.rgb(188, 206, 217));
             demoCard.addView(demoStatus);
+
+            LinearLayout demoActions = new LinearLayout(this);
+            demoButton = demoAction("가상 체험 시작", () -> {
+                if (parking.allowed(SystemClock.elapsedRealtime())) openDemo();
+                else renderParking();
+            });
+            demoButton.setEnabled(false);
+            demoActions.addView(demoButton);
+            demoEndButton = demoAction("체험 종료", this::confirmDemoEnd);
+            demoEndButton.setVisibility(View.GONE);
+            demoActions.addView(demoEndButton);
+            demoCard.addView(demoActions);
+
+            demoVehicles = text("", 17, Color.rgb(207, 198, 233));
             demoCard.addView(demoVehicles);
             demoQuickMessages = new LinearLayout(this);
             for (SharingModels.MessageKind kind : SharingModels.MessageKind.SEND_PRESETS) {
@@ -104,8 +124,9 @@ public class MainActivity extends Activity {
                 }));
             }
             demoCard.addView(demoQuickMessages);
-            root.addView(demoCard);
-            demoCard.setVisibility(View.GONE);
+            LinearLayout.LayoutParams demoLayout = new LinearLayout.LayoutParams(-1, -2);
+            demoLayout.topMargin = dp(12);
+            root.addView(demoCard, demoLayout);
         }
         setContentView(scroll);
         source = new PleosJourneySource(this, state, this::render);
@@ -116,35 +137,29 @@ public class MainActivity extends Activity {
     }
     @Override protected void onStop() {
         handler.removeCallbacks(ticker); source.stop(); if (parkingSource != null) parkingSource.stop();
-        if (demoIntro != null) demoIntro.dismiss(); super.onStop();
+        if (demoEndConfirmation != null) demoEndConfirmation.dismiss();
+        super.onStop();
     }
     private void renderParking() {
         if (groupButton == null) return;
         boolean allowed = parking.allowed(SystemClock.elapsedRealtime());
-        if (demoButton != null) {
-            demoButton.setEnabled(allowed);
-            demoButton.setText(demoOverview == null ? "가상 차량으로 체험 (정차 중)" : "가상 체험 이어가기");
-        }
         groupButton.setEnabled(allowed || parking.messagesAllowed(SystemClock.elapsedRealtime()));
         renderDemoStatus(allowed);
         parkingLabel.setText((allowed ? "정차 중에 이용할 수 있어요 · " : "정차 후 이용해 주세요 · ") + parking.description(SystemClock.elapsedRealtime()));
         vehiclePermission.setVisibility(parkingSource.hasPermission() ? View.GONE : View.VISIBLE);
-        if (!allowed && demoIntro != null && demoIntro.isShowing()) demoIntro.dismiss();
+        if (!allowed && demoEndConfirmation != null) demoEndConfirmation.dismiss();
     }
-    private void showDemoIntro() {
-        if (!parking.allowed(SystemClock.elapsedRealtime())) { renderParking(); return; }
-        if (demoOverview != null) {
-            openDemo();
-            return;
-        }
-        demoIntro = new AlertDialog.Builder(this).setTitle("가상 차량으로 체험")
-                .setMessage("가상 차량의 위치와 도착 시간을 보고 메시지를 주고받는 체험입니다. 체험 데이터는 외부로 보내지 않습니다.\n정차 중에만 이용할 수 있습니다. 메인 화면에서 가상 팀원 정보를 볼 수 있으며, 정차가 확인되면 체험을 이어갈 수 있습니다.")
-                .setNegativeButton("닫기", null)
-                .setPositiveButton("체험 화면 열기", (ignored, which) -> {
-                    if (parking.allowed(SystemClock.elapsedRealtime())) openDemo();
-                    else renderParking();
-                }).create();
-        demoIntro.show();
+    private void confirmDemoEnd() {
+        if (demoReset == null || !parking.allowed(SystemClock.elapsedRealtime())) return;
+        demoEndConfirmation = new AlertDialog.Builder(this).setTitle("가상 체험을 종료할까요?")
+                .setMessage("가상 그룹과 팀원, 메시지가 초기화됩니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("체험 종료", (ignored, which) -> {
+                    if (demoReset != null && parking.allowed(SystemClock.elapsedRealtime())) {
+                        demoReset.run();
+                        renderParking();
+                    }
+                }).show();
     }
     private void openDemo() {
         startActivity(new Intent().setClassName(getPackageName(), getPackageName() + ".SharingDemoActivity"));
@@ -152,8 +167,17 @@ public class MainActivity extends Activity {
     private void renderDemoStatus(boolean allowed) {
         if (demoCard == null) return;
         SharingModels.Snapshot snapshot = demoOverview == null ? null : demoOverview.get();
-        demoCard.setVisibility(snapshot == null ? View.GONE : View.VISIBLE);
-        if (snapshot == null) return;
+        boolean active = snapshot != null;
+        demoButton.setText(active ? "가상 체험 이어가기" : "가상 체험 시작");
+        demoButton.setEnabled(allowed);
+        demoEndButton.setVisibility(active ? View.VISIBLE : View.GONE);
+        demoEndButton.setEnabled(allowed);
+        demoVehicles.setVisibility(active ? View.VISIBLE : View.GONE);
+        if (!active) {
+            demoStatus.setText(allowed ? "정차 확인 · 새 체험을 시작할 수 있어요" : "정차 후 체험을 시작할 수 있어요");
+            demoQuickMessages.setVisibility(View.GONE);
+            return;
+        }
         boolean canSend = parking.messagesAllowed(SystemClock.elapsedRealtime())
                 && snapshot.sharing && snapshot.connection == SharingModels.Connection.CONNECTED;
         demoQuickMessages.setVisibility(canSend ? View.VISIBLE : View.GONE);
@@ -166,10 +190,9 @@ public class MainActivity extends Activity {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        StringBuilder rows = new StringBuilder();
+        StringBuilder rows = new StringBuilder("가상 팀원 상황");
         for (SharingModels.Vehicle vehicle : snapshot.vehicles) {
-            if (rows.length() > 0) rows.append('\n');
-            rows.append(vehicle.name).append(" · ").append(vehicle.destinationName).append(" · ");
+            rows.append('\n').append(vehicle.name).append(" · ").append(vehicle.destinationName).append(" · ");
             if (snapshot.connection != SharingModels.Connection.CONNECTED) rows.append("모의 연결 끊김");
             else if (vehicle.stale(now)) rows.append("갱신 대기");
             else rows.append("마지막 예상 소요 약 ").append((vehicle.remainingSeconds + 59) / 60).append("분");
@@ -250,9 +273,21 @@ public class MainActivity extends Activity {
     }
     private LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
     private LinearLayout card(String title) {
+        return card(title, Color.rgb(25, 41, 54));
+    }
+    private LinearLayout card(String title, int color) {
         LinearLayout view = column(); view.setPadding(dp(22), dp(18), dp(22), dp(20));
-        GradientDrawable background = new GradientDrawable(); background.setColor(Color.rgb(25, 41, 54)); background.setCornerRadius(dp(16)); view.setBackground(background);
-        TextView label = text(title, 17, Color.rgb(156, 178, 192)); label.setPadding(0, 0, 0, dp(12)); view.addView(label); return view;
+        GradientDrawable background = new GradientDrawable(); background.setColor(color); background.setCornerRadius(dp(16)); view.setBackground(background);
+        TextView label = text(title, 17, Color.rgb(156, 178, 192));
+        label.setPadding(0, 0, 0, dp(8));
+        view.addView(label);
+        return view;
+    }
+    private Button demoAction(String label, Runnable action) {
+        Button view = button(label, action);
+        view.setTextSize(18);
+        view.setMinHeight(dp(56));
+        return view;
     }
     private TextView text(String value, int size, int color) {
         TextView view = new TextView(this); view.setText(value); view.setTextSize(size); view.setTextColor(color); view.setPadding(0, dp(4), 0, dp(5)); return view;

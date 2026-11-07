@@ -50,6 +50,10 @@ public final class SharingDemoActivity extends Activity {
         LinearLayout root = column(); root.setPadding(28,20,28,30); scroll.addView(root);
         root.addView(text("동행길 · 가상 차량 체험", 28));
         root.addView(text("체험 화면의 차량·주소·메시지는 모두 가상이며 외부로 전송하지 않습니다. 실제 내 차량 정보는 메인 화면에서 확인하세요.", 16));
+        LinearLayout sessionActions = row();
+        sessionActions.addView(button("내 차량 화면으로", this::finish));
+        sessionActions.addView(button("체험 종료", this::endDemo));
+        root.addView(sessionActions);
         status = text("", 17); root.addView(status);
         nextStep = text("", 18); root.addView(nextStep);
         LinearLayout groupActions = row(); root.addView(groupActions);
@@ -89,8 +93,6 @@ public final class SharingDemoActivity extends Activity {
         receiveExample = demoButton("가상 차량에서 메시지 받기", () -> scenario.receiveExampleMessage());
         root.addView(receiveExample);
         messages = column(); root.addView(messages);
-        root.addView(button("내 차량 화면으로", this::finish));
-        root.addView(button("체험 종료", this::endDemo));
         setContentView(scroll);
     }
     @Override protected void onStart() {
@@ -121,12 +123,16 @@ public final class SharingDemoActivity extends Activity {
     }
     private void endDemo() {
         suspendDemoUi();
+        resetDemo();
+        finish();
+    }
+    private static void resetDemo() {
         if (scenario != null) scenario.close();
         scenario = null;
         approval = Approval.NONE;
         MainActivity.demoOverview = null;
         MainActivity.demoSend = null;
-        finish();
+        MainActivity.demoReset = null;
     }
     private void requestJoin() {
         if (!"DEMO42".equalsIgnoreCase(invite.getText().toString().trim())) {
@@ -166,6 +172,7 @@ public final class SharingDemoActivity extends Activity {
         });
         MainActivity.demoOverview = scenario::refreshOverview;
         MainActivity.demoSend = scenario::sendFromOverview;
+        MainActivity.demoReset = SharingDemoActivity::resetDemo;
         showActiveDemo();
     }
     private void showActiveDemo() {
@@ -194,7 +201,7 @@ public final class SharingDemoActivity extends Activity {
         locked.setBackgroundColor(Color.rgb(14, 24, 34));
         locked.addView(text(allowed ? "정차 확인 · 체험 가능" : "정차 후 체험할 수 있어요", 24));
         locked.addView(text(reason, 18));
-        locked.addView(text(scenario == null ? "P 기어로 정차하면 새 체험을 시작할 수 있습니다."
+        locked.addView(text(scenario == null ? "차량·주소·메시지는 모두 가상이며 외부로 전송하지 않습니다. P 기어로 정차한 뒤 시작할 수 있어요."
                 : "그룹과 메시지를 보관했습니다. 정차가 확인되면 체험을 이어갑니다.", 17));
         if (scenario == null) {
             Button start = button("새 체험 시작", this::startDemo);
