@@ -10,6 +10,11 @@ if (defaultRelayUrl) {
 }
 def relayUrlLiteral = groovy.json.JsonOutput.toJson(defaultRelayUrl)
 
+def releaseCredentials = ['STORE_FILE', 'STORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD'].collectEntries { name ->
+    [(name): providers.environmentVariable("DONGHAENG_RELEASE_${name}").orNull]
+}
+def releaseSigningConfigured = releaseCredentials.values().every { it != null && !it.trim().isEmpty() }
+
 android {
     namespace 'io.demo.companion'
     buildFeatures { buildConfig true }
@@ -32,6 +37,16 @@ android {
             buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true'
         }
     }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseCredentials.STORE_FILE)
+                storePassword releaseCredentials.STORE_PASSWORD
+                keyAlias releaseCredentials.KEY_ALIAS
+                keyPassword releaseCredentials.KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         debug {
             buildConfigField 'String', 'DEFAULT_RELAY_URL', groovy.json.JsonOutput.toJson(defaultRelayUrl ?: 'http://10.0.2.2:8787')
@@ -40,7 +55,7 @@ android {
         }
         release {
             debuggable false
-            // Signing is deliberately not configured in this step.
+            if (releaseSigningConfigured) signingConfig signingConfigs.release
         }
     }
     sourceSets {
@@ -60,13 +75,13 @@ dependencies {
     implementation 'ai.pleos.playground:NaviHelper:3.0.5'
 }
 
-// Allow compile/manifest validation without producing unsigned distribution artifacts.
-// Replace this gate with validated Release signing/readiness checks in the signing task.
 def releaseDistributionGate = tasks.register('verifyReleaseDistributionConfigured') {
     group = 'verification'
-    description = 'Blocks APK/AAB packaging until Release signing and submission safety are configured.'
+    description = 'Requires explicit Release signing credentials before packaging.'
     doLast {
-        throw new GradleException('RELEASE_DISTRIBUTION_NOT_CONFIGURED: Release signing is deferred; APK/AAB packaging is disabled. Use compileStandardReleaseJavaWithJavac / compileSubmissionReleaseJavaWithJavac for configuration checks.')
+        if (!releaseSigningConfigured || !file(releaseCredentials.STORE_FILE).isFile()) {
+            throw new GradleException('RELEASE_DISTRIBUTION_NOT_CONFIGURED: Set all DONGHAENG_RELEASE_* signing variables and provide an existing keystore.')
+        }
     }
 }
 tasks.configureEach {
