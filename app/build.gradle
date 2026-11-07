@@ -1,6 +1,14 @@
 plugins { id 'com.android.application' }
 
 def localHttpsCa = providers.gradleProperty('donghaengLocalTlsCa').orNull
+def defaultRelayUrl = providers.gradleProperty('donghaengRelayUrl').getOrElse('').trim()
+if (defaultRelayUrl) {
+    def uri = new java.net.URI(defaultRelayUrl)
+    if (uri.scheme != 'https' || !uri.host || uri.userInfo || uri.query || uri.fragment || !(uri.path in ['', '/'])) {
+        throw new GradleException('donghaengRelayUrl must be an HTTPS server origin without credentials, query or path.')
+    }
+}
+def relayUrlLiteral = groovy.json.JsonOutput.toJson(defaultRelayUrl)
 
 android {
     namespace 'io.demo.companion'
@@ -14,6 +22,7 @@ android {
         versionCode 1
         versionName '0.1'
         buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'false'
+        buildConfigField 'String', 'DEFAULT_RELAY_URL', relayUrlLiteral
     }
     flavorDimensions 'distribution'
     productFlavors {
@@ -25,6 +34,7 @@ android {
     }
     buildTypes {
         debug {
+            buildConfigField 'String', 'DEFAULT_RELAY_URL', groovy.json.JsonOutput.toJson(defaultRelayUrl ?: 'http://10.0.2.2:8787')
             buildConfigField 'boolean', 'HAS_SHARING_DEMO', 'true'
             manifestPlaceholders.debugNetworkSecurityConfig = localHttpsCa ? '@xml/network_security_config_local_tls' : '@xml/network_security_config'
         }

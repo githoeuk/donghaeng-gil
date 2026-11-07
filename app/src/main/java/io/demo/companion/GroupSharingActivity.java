@@ -7,6 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.IBinder;
 import android.graphics.Color;
@@ -45,7 +46,12 @@ public final class GroupSharingActivity extends Activity {
     private VehicleParkingSource parkingSource;
     private HttpSharingTransport relay;
     private EditText endpoint,name,code;
-    private TextView safety,status,vehicles,groupHelp;
+    private TextView safety,status,vehicles,groupHelp,settingsSummary,settingsFeedback;
+    private SharedPreferences settings;
+    private LinearLayout settingsPanel;
+    private Button settingsToggle,connectButton;
+    private boolean settingsExpanded;
+    private static final String SETTINGS = "sharing_connection_settings";
     private Button copyInvite;
     private LinearLayout messages, management;
     private String renderedManagement="initial";
@@ -57,16 +63,29 @@ public final class GroupSharingActivity extends Activity {
     }};
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
+        settings=getSharedPreferences(SETTINGS,MODE_PRIVATE);
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root=column(); root.setPadding(28,18,28,24); scroll.addView(root);
         root.addView(text("동행길 · 실제 서버 공유",26));
         root.addView(text("모의 모드가 아닙니다. 공유 시작 후 내비 등 다른 앱에서도 실제 위치·목적지·ETA를 전송합니다. 중지 버튼이나 지속 알림에서 종료하세요.",16));
         safety=text("차량 상태 확인 중",16);root.addView(safety);
         Button permissions=parkedButton("위치·차량 상태 권한",()->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,VehicleParkingSource.SPEED_PERMISSION},22));root.addView(permissions);
+        settingsSummary=text("",16);root.addView(settingsSummary);
         LinearLayout setup=row();root.addView(setup);
-        endpoint=edit(BuildConfig.DEBUG?"http://10.0.2.2:8787":"","서버 주소");setup.addView(endpoint,new LinearLayout.LayoutParams(0,-2,3));
-        name=edit("차량","차량 이름");setup.addView(name,new LinearLayout.LayoutParams(0,-2,1));
-        setup.addView(parkedButton("서버 연결",this::connect)); parkedControls.add(endpoint); parkedControls.add(name);
+        setup.addView(text("차량 이름",18));
+        name=edit(settings.getString("vehicle_name","차량"),"차량 이름");
+        name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});
+        setup.addView(name,new LinearLayout.LayoutParams(0,-2,1));parkedControls.add(name);
+        connectButton=parkedButton("서버 연결",this::connect);setup.addView(connectButton);
+        settingsToggle=parkedButton("연결 설정",()->{settingsExpanded=!settingsExpanded;render();});root.addView(settingsToggle);
+        settingsPanel=column();root.addView(settingsPanel);
+        settingsPanel.addView(text("두 차량 모두 같은 서버를 사용하세요. 저장해도 자동으로 연결하거나 위치를 공유하지 않습니다.",16));
+        endpoint=edit(settings.getString("endpoint",BuildConfig.DEFAULT_RELAY_URL),"서버 주소");
+        settingsPanel.addView(endpoint);parkedControls.add(endpoint);
+        settingsFeedback=text("주소·이름을 바꾼 뒤 설정 저장 또는 서버 연결을 누르세요. 연결 중인 설정에는 다시 연결해야 반영됩니다.",16);settingsPanel.addView(settingsFeedback);
+        LinearLayout settingsActions=row();settingsPanel.addView(settingsActions);
+        settingsActions.addView(parkedButton("설정 저장",()->saveSettings(true)));
+        settingsActions.addView(parkedButton("기본 서버 사용",()->{if(!setupLocked()){endpoint.setText(BuildConfig.DEFAULT_RELAY_URL);updateText(settingsFeedback,"기본 서버 주소를 불러왔습니다. 설정 저장을 눌러 적용하세요.");render();}}));
         status=text("서버 연결 전 · 위치 전송 중지",17);root.addView(status);
         groupHelp=text("두 차량 모두 같은 서버에 연결하세요. 한 차량이 그룹을 만들고, 다른 차량은 받은 초대 코드로 참여합니다.",16);root.addView(groupHelp);
         LinearLayout group=row();root.addView(group);
@@ -82,7 +101,10 @@ public final class GroupSharingActivity extends Activity {
         for(MessageKind kind:MessageKind.values())actions.addView(parkedButton(kind.label,()->{if(relay!=null)relay.send(kind);}));
         management=column();root.addView(management);
         messages=column();root.addView(messages);
-        root.addView(button("내 차량 화면으로",this::finish));setContentView(scroll);
+        root.addView(button("내 차량 화면으로",this::finish));
+        // These controls also depend on connection/group state; apply their final state only once per render.
+        for(View control:new View[]{endpoint,name,connectButton,settingsToggle})parkedControls.remove(control);
+        setContentView(scroll);
         parkingSource=new VehicleParkingSource(this,parking,this::render);
     }
     private void copyInviteCode(){
@@ -101,8 +123,27 @@ public final class GroupSharingActivity extends Activity {
         clipboard.setPrimaryClip(clip);
         android.widget.Toast.makeText(this,"초대 코드를 복사했습니다. 동행할 상대에게 직접 전달하세요.",android.widget.Toast.LENGTH_LONG).show();
     }
+    private boolean setupLocked(){
+        return service!=null && (service.active() || (service.transport()!=null
+            && (!service.transport().snapshot().groupId.isEmpty() || service.transport().isApprovalPending())));
+    }
+    private boolean saveSettings(boolean announce){
+        if(!parking.allowed(SystemClock.elapsedRealtime()) || setupLocked())return false;
+        try{
+            String address=RelayEndpoint.validate(endpoint.getText().toString(),BuildConfig.DEBUG);
+            String vehicleName=name.getText().toString().trim();
+            if(vehicleName.isEmpty() || vehicleName.length()>24)throw new IllegalArgumentException("차량 이름은 1~24자로 입력하세요.");
+            settings.edit().putString("endpoint",address).putString("vehicle_name",vehicleName).apply();
+            endpoint.setText(address);name.setText(vehicleName);
+            updateText(settingsFeedback,"설정을 저장했습니다. 서버 연결을 눌러 연결하세요.");
+            if(announce)android.widget.Toast.makeText(this,"설정을 저장했습니다.",android.widget.Toast.LENGTH_SHORT).show();
+            render();return true;
+        }catch(IllegalArgumentException error){settingsExpanded=true;render();updateText(settingsFeedback,error.getMessage());return false;}
+    }
     private void connect(){
         if(service==null){updateText(status,"공유 서비스 연결을 기다려 주세요.");return;}
+        if(!parking.allowed(SystemClock.elapsedRealtime()) || setupLocked())return;
+        if(!saveSettings(false))return;
         try{service.connect(endpoint.getText().toString(),name.getText().toString());}
         catch(IllegalArgumentException error){updateText(status,error.getMessage());}
     }
@@ -113,7 +154,7 @@ public final class GroupSharingActivity extends Activity {
             updateText(status,"지속 알림 권한 허용 후 공유 시작을 다시 눌러 주세요.");return;
         }
         consent=new AlertDialog.Builder(this).setTitle("실제 위치 공유 시작")
-            .setMessage("현재 위치 좌표·주소, 내비 목적지·남은 시간·거리를 입력한 서버와 그룹 구성원에게 보냅니다. 내비 등 다른 앱으로 이동해도 공유 중지·그룹 탈퇴·앱 작업 종료 전까지 전송합니다. 지속 알림에서 언제든 중지할 수 있습니다. 서버는 메모리에 임시 보관합니다.\n서버: "+endpoint.getText())
+            .setMessage("현재 위치 좌표·주소, 내비 목적지·남은 시간·거리를 입력한 서버와 그룹 구성원에게 보냅니다. 내비 등 다른 앱으로 이동해도 공유 중지·그룹 탈퇴·앱 작업 종료 전까지 전송합니다. 지속 알림에서 언제든 중지할 수 있습니다. 서버는 메모리에 임시 보관합니다.\n서버: "+service.endpoint())
             .setNegativeButton("취소",null).setPositiveButton("위치 공유 시작",(dialog,which)->{
                 if(parking.allowed(SystemClock.elapsedRealtime()) && service!=null)service.requestStart(this,parking);
             }).create();consent.show();
@@ -144,7 +185,15 @@ public final class GroupSharingActivity extends Activity {
         if(!parked && consent!=null && consent.isShowing())consent.dismiss();
         if(!parked){endpoint.clearFocus();name.clearFocus();code.clearFocus();android.view.inputmethod.InputMethodManager input=getSystemService(android.view.inputmethod.InputMethodManager.class);if(input!=null)input.hideSoftInputFromWindow(code.getWindowToken(),0);}
         boolean sharingActive=service!=null && service.active();
-        endpoint.setEnabled(parked && !sharingActive);name.setEnabled(parked && !sharingActive);
+        boolean locked=setupLocked();
+        endpoint.setEnabled(parked && !locked);name.setEnabled(parked && !locked);
+        connectButton.setEnabled(parked && !locked && service!=null);
+        settingsToggle.setEnabled(parked && !locked);
+        settingsPanel.setVisibility(parked && !locked && settingsExpanded?View.VISIBLE:View.GONE);
+        String address=relay!=null?service.endpoint():endpoint.getText().toString().trim();
+        updateText(settingsSummary,address.isEmpty()?"공유 서버가 아직 설정되지 않았습니다. 연결 설정에서 서버 주소를 지정하세요.":
+            (relay!=null?"연결 서버: ":"사용할 서버: ")+address+(BuildConfig.DEBUG && address.equals("http://10.0.2.2:8787")?" · 에뮬레이터 로컬 시험용":"")
+            +(locked?"\n그룹 나가기 후 연결 설정을 바꿀 수 있습니다.":"\n차량 이름을 확인하고 서버 연결을 누르세요."));
         if(relay==null){
             copyInvite.setEnabled(false);
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
