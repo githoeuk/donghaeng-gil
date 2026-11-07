@@ -49,7 +49,7 @@ public final class GroupSharingActivity extends Activity {
     private TextView safety,status,vehicles,groupHelp,settingsSummary,settingsFeedback;
     private SharedPreferences settings;
     private LinearLayout settingsPanel;
-    private Button settingsToggle,connectButton;
+    private Button settingsToggle,connectButton,createGroup,joinGroup,startSharing;
     private boolean settingsExpanded;
     private static final String SETTINGS = "sharing_connection_settings";
     private Button copyInvite;
@@ -70,6 +70,7 @@ public final class GroupSharingActivity extends Activity {
         root.addView(text("모의 모드가 아닙니다. 공유 시작 후 내비 등 다른 앱에서도 실제 위치·목적지·ETA를 전송합니다. 중지 버튼이나 지속 알림에서 종료하세요.",16));
         safety=text("차량 상태 확인 중",16);root.addView(safety);
         Button permissions=parkedButton("위치·차량 상태 권한",()->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,VehicleParkingSource.SPEED_PERMISSION},22));root.addView(permissions);
+        root.addView(text("1. 연결 준비",20));
         settingsSummary=text("",16);root.addView(settingsSummary);
         LinearLayout setup=row();root.addView(setup);
         setup.addView(text("차량 이름",18));
@@ -87,13 +88,14 @@ public final class GroupSharingActivity extends Activity {
         settingsActions.addView(parkedButton("설정 저장",()->saveSettings(true)));
         settingsActions.addView(parkedButton("기본 서버 사용",()->{if(!setupLocked()){endpoint.setText(BuildConfig.DEFAULT_RELAY_URL);updateText(settingsFeedback,"기본 서버 주소를 불러왔습니다. 설정 저장을 눌러 적용하세요.");render();}}));
         status=text("서버 연결 전 · 위치 전송 중지",17);root.addView(status);
+        root.addView(text("2. 그룹 만들기 또는 참여 → 3. 각자 공유 동의",20));
         groupHelp=text("두 차량 모두 같은 서버에 연결하세요. 한 차량이 그룹을 만들고, 다른 차량은 받은 초대 코드로 참여합니다.",16);root.addView(groupHelp);
         LinearLayout group=row();root.addView(group);
-        group.addView(parkedButton("그룹 만들기",()->{if(relay!=null)relay.createGroup();}));
+        createGroup=parkedButton("그룹 만들기",()->{if(relay!=null)relay.createGroup();});group.addView(createGroup);
         code=edit("","초대 코드");group.addView(code,new LinearLayout.LayoutParams(240,-2));parkedControls.add(code);
-        group.addView(parkedButton("참여 요청",()->{if(relay!=null)relay.joinGroup(code.getText().toString());}));
+        joinGroup=parkedButton("참여 요청",()->{if(relay!=null)relay.joinGroup(code.getText().toString());});group.addView(joinGroup);
         copyInvite=parkedButton("초대 코드 복사",this::copyInviteCode);parkedControls.remove(copyInvite);root.addView(copyInvite);
-        group.addView(parkedButton("공유 시작",this::confirmSharing));
+        startSharing=parkedButton("공유 시작",this::confirmSharing);group.addView(startSharing);
         group.addView(button("공유 중지",()->{if(service!=null)service.stopSharing();}));
         group.addView(button("그룹 나가기",()->{if(service!=null)service.leaveGroup();}));
         vehicles=text("서버에서 받은 차량 정보가 없습니다.",17);root.addView(vehicles);
@@ -103,7 +105,7 @@ public final class GroupSharingActivity extends Activity {
         messages=column();root.addView(messages);
         root.addView(button("내 차량 화면으로",this::finish));
         // These controls also depend on connection/group state; apply their final state only once per render.
-        for(View control:new View[]{endpoint,name,connectButton,settingsToggle})parkedControls.remove(control);
+        for(View control:new View[]{endpoint,name,connectButton,settingsToggle,createGroup,joinGroup,code,startSharing})parkedControls.remove(control);
         setContentView(scroll);
         parkingSource=new VehicleParkingSource(this,parking,this::render);
     }
@@ -148,7 +150,8 @@ public final class GroupSharingActivity extends Activity {
         catch(IllegalArgumentException error){updateText(status,error.getMessage());}
     }
     private void confirmSharing(){
-        if(service==null || relay==null)return;
+        if(service==null || relay==null || service.active() || relay.snapshot().groupId.isEmpty()
+            || relay.snapshot().connection!=Connection.CONNECTED || !parking.allowed(SystemClock.elapsedRealtime()))return;
         if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},23);
             updateText(status,"지속 알림 권한 허용 후 공유 시작을 다시 눌러 주세요.");return;
@@ -194,13 +197,22 @@ public final class GroupSharingActivity extends Activity {
         updateText(settingsSummary,address.isEmpty()?"공유 서버가 아직 설정되지 않았습니다. 연결 설정에서 서버 주소를 지정하세요.":
             (relay!=null?"연결 서버: ":"사용할 서버: ")+address+(BuildConfig.DEBUG && address.equals("http://10.0.2.2:8787")?" · 에뮬레이터 로컬 시험용":"")
             +(locked?"\n그룹 나가기 후 연결 설정을 바꿀 수 있습니다.":"\n차량 이름을 확인하고 서버 연결을 누르세요."));
+        boolean connected=relay!=null && relay.snapshot().connection==Connection.CONNECTED;
+        boolean grouped=relay!=null && !relay.snapshot().groupId.isEmpty();
+        boolean pending=relay!=null && relay.isApprovalPending();
+        createGroup.setEnabled(parked && connected && !grouped && !pending);
+        joinGroup.setEnabled(parked && connected && !grouped && !pending);
+        code.setEnabled(parked && connected && !grouped && !pending);
+        startSharing.setEnabled(parked && connected && grouped && !sharingActive);
         if(relay==null){
             copyInvite.setEnabled(false);
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
-            updateText(groupHelp,"1. 두 차량 모두 같은 서버 주소로 연결하세요. 로컬 시험은 PC에서 중계 서버를 먼저 실행해야 합니다.");
+            updateText(groupHelp,"1단계 · 차량 이름을 확인하고 서버 연결을 누르세요. 두 차량은 같은 서버를 사용해야 합니다. 내비에서 목적지를 설정하면 ETA도 공유할 수 있습니다.");
             updateText(vehicles,"공유된 차량 정보가 없습니다.");
             renderManagement(parked);
-            parkedControls.removeIf(view -> view.getParent()==messages);messages.removeAllViews();renderedMessages="initial";
+            if(!"disconnected".equals(renderedMessages)){
+                parkedControls.removeIf(view -> view.getParent()==messages);messages.removeAllViews();renderedMessages="disconnected";
+            }
             return;
         }
         Snapshot snapshot=relay.snapshot(); if(snapshot.demo)throw new IllegalStateException("Real screen cannot show mock data");
@@ -211,11 +223,12 @@ public final class GroupSharingActivity extends Activity {
         copyInvite.setEnabled(parked && inGroup && relay.isGroupOwner() && !snapshot.inviteCode.isEmpty()
             && snapshot.connection==Connection.CONNECTED);
         updateText(groupHelp,snapshot.connection!=Connection.CONNECTED
-            ?"서버 연결 상태를 확인하세요. 두 차량이 같은 서버에 연결되어야 참여할 수 있습니다."
-            :relay.isApprovalPending()?"그룹장 승인 대기 중입니다. 취소하려면 그룹 나가기를 누르세요."
-            :!inGroup?"그룹을 만들거나 초대 코드를 입력해 참여 요청을 보내세요. 그룹장 승인이 필요합니다."
-            :relay.isGroupOwner()?"그룹장입니다. 참여 요청을 승인하세요. 그룹장이 나가면 그룹 전체가 종료됩니다. 각 차량의 공유 동의는 별도입니다."
-            :"참여가 승인됐습니다. 위치를 보내려면 공유 시작에 동의하세요. 초대 코드는 그룹장만 관리합니다.");
+            ?"연결 확인 · 서버 상태를 확인하세요. 설정을 저장해도 공유는 자동 시작되지 않습니다."
+            :relay.isApprovalPending()?"2단계 · 그룹장 승인 대기 중입니다. 승인 전에는 위치 정보를 받거나 보낼 수 없습니다. 취소는 그룹 나가기를 누르세요."
+            :!inGroup?"2단계 · 함께 출발할 분은 그룹 만들기, 초대받은 분은 전달받은 코드를 입력하고 참여 요청을 누르세요."
+            :snapshot.sharing?"공유 중 · 내비 화면에서도 공유를 유지합니다. 공유 중지 또는 그룹 나가기로 종료하세요."
+            :relay.isGroupOwner()?"3단계 · 초대 코드를 복사해 상대에게 직접 전달하고 아래 그룹장 관리에서 참여 요청을 승인하세요. 내 위치도 보내려면 공유 시작을 눌러 별도로 동의하세요. 그룹장이 나가면 그룹 전체가 종료됩니다."
+            :"3단계 · 참여가 승인됐습니다. 공유 시작을 누르고 전송 범위를 확인해 동의하세요. 각 차량의 동의가 필요합니다.");
         renderManagement(parked);
         long now=SystemClock.elapsedRealtime();Vehicle mine=null;
         for(Vehicle vehicle:snapshot.vehicles)if(vehicle.id.equals(relay.userId()))mine=vehicle;
