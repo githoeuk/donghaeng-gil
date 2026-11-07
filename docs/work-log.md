@@ -562,3 +562,11 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 화면 갱신 중 uiautomator가 idle 상태를 얻지 못한 수집은 실패로 제외했다. 최신 ADB 스크린샷을 관측한 좌표 입력과 새 캡처로 후속 상태를 확인했다. 비공개 GroupSharingActivity의 직접 adb 시작은 보안 정책대로 거절됐고, MainActivity의 정상 내부 버튼으로 복귀했다. Activity 공개 설정이나 안전 게이트를 변경하지 않았다. Windows computer-use 스킬 문서는 읽었지만 실제 시험은 Android ADB 도구로 수행했다.
 - 정리: 양쪽 내비 '안내 종료' 후 '어디로 갈까요?'를 확인했다(two-docker-*-nav-end.xml). 이번 GPS feeder PID/명령행을 대조해 종료하고 기록된 원래 좌표를 복원했다. CA 없는 일반 standardDebug를 재빌드·양쪽 install -r하고 앱 종료, 두 에뮬레이터 종료, 시험 Compose 프로젝트 down을 완료했다. 일반 APK에 local_https_ca/network_security_config_local_tls 항목0개도 확인했다. AVD 설정은 수정하지 않았으며 실행 인자 -no-snapshot/-feature -Vulkan만 사용했다. Docker 이미지·인증서 볼륨은 보존한다.
 - 앱/서버 코드 보완은 필요하지 않았고 시험 준비 절차만 운영 가이드에 추가했다. opt-in/일반 Debug 빌드 성공, 기존 Java8/Gradle 경고는 유지된다. 이번에는 Java 상태 검사/Release 변형 검사를 다시 실행하지 않았다. 공인 도메인·외부 네트워크·실차·Release 서명/제출 APK 검증은 별도다. 증거는 Git 제외 .gradle에만 보관한다. 커밋·푸시하지 않았다.
+
+## 2026-11-07 — 실제 공유 설정과 단계별 안내 검증
+
+- Debug의 기본 서버는 `http://10.0.2.2:8787`이다. 공인 서버 주소가 정해지면 `-PdonghaengRelayUrl=https://서버호스트`로 빌드 기본값을 지정할 수 있다. Release는 주소 미지정 시 연결 설정을 안내한다. 네 빌드 변형의 생성 설정에 시험 HTTPS 주소가 반영되는 것을 확인했다.
+- 정차 중 연결 설정에서 서버 주소를 바꾸거나 기본값을 불러올 수 있다. 설정 저장 또는 서버 연결 시 검증한 주소와 차량 이름만 기기에 보관한다. 앱 강제 종료 후 재실행에서 두 값이 복원되고 서버 연결 전·공유 중지 상태가 유지됐다. 외부 HTTP 주소를 입력하면 오류를 표시하고 기존 설정을 보존했다. 근거는 `settings-restored.png`, `settings-invalid-result.png`와 `two-settings-final.xml`이다.
+- 서버 연결, 그룹 생성·참여 요청, 승인 대기, 각자 공유 동의, 공유 중 상태에 맞춰 안내한다. 한 대의 Pleos 에뮬레이터와 로컬 HTTP 중계에서 기본 서버 연결, 그룹장 생성, 설정 변경 잠금, 동의창의 실제 연결 주소, 새 동의 후 공유 시작·중지·탈퇴를 확인했다. 이번 실행의 기기 검증 범위는 그룹장 흐름이다. 근거는 `two-settings-final-connect.xml`, `two-settings-final-create.xml`, `two-settings-final-consent.xml`, `two-settings-final-sharing.xml`, `two-settings-final-left.xml`이다.
+- Virtual Console에서 P→D→P를 전환했다. D에서 설정 패널이 숨고 이름·서버 연결·초대 코드·그룹·메시지 조작이 잠겼으며 공유 중지·탈퇴·복귀는 가능했다. 동의창을 연 상태에서 D로 바꾸자 창이 닫혔고, P 복귀 뒤 다시 동의한 경우에만 공유가 시작됐다. 근거는 `two-settings-driving.xml`, `two-settings-final-consent-driving.xml`, `two-settings-final-return.xml`이다.
+- 연결 전 안내 영역의 반복 생성과 조건부 버튼의 중복 활성 전환을 정리했다. 이후 최종 APK에서 화면 XML을 수집할 수 있었다. Java 상태 검사 178개와 네 빌드 변형 구성 검사 104개를 통과했다. 화면 증거는 Git 제외 `.gradle`에 보관했다.
