@@ -6,6 +6,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.Person;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -18,6 +19,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import static io.demo.companion.SharingModels.*;
 
@@ -25,7 +27,15 @@ import static io.demo.companion.SharingModels.*;
 public final class SharingService extends Service {
     public static final String STOP = "io.demo.companion.STOP_SHARING";
     private static final String START = "io.demo.companion.START_SHARING", CHANNEL = "donghaeng_sharing";
-    private static final int NOTIFICATION = 301;
+    private static final String MESSAGE_CHANNEL = "donghaeng_messages";
+    private static final String DISMISS_MESSAGE = "io.demo.companion.DISMISS_MESSAGE";
+    private static final int NOTIFICATION = 301, MESSAGE_NOTIFICATION = 303;
+    private static final long MESSAGE_VISIBLE_MS = 3000;
+    private static final long MESSAGE_ALERT_INTERVAL_MS = 4000;
+    private final ParkingState messageParking = new ParkingState();
+    private final Set<String> receivedMessages = new LinkedHashSet<>();
+    private VehicleParkingSource messageVehicleSource;
+    private long lastMessageAlert = -MESSAGE_VISIBLE_MS;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SharingLifetime lifetime = new SharingLifetime();
     private final JourneyState journey = new JourneyState();
@@ -44,7 +54,15 @@ public final class SharingService extends Service {
         source = new PleosJourneySource(this,journey,()->{});
         NotificationChannel channel = new NotificationChannel(CHANNEL,"동행길 위치 공유",NotificationManager.IMPORTANCE_LOW);
         channel.setDescription("다른 앱 사용 중에도 진행되는 위치·도착시간 공유와 중지");channel.setSound(null,null);
-        getSystemService(NotificationManager.class).createNotificationChannel(channel);
+        NotificationManager notifications = getSystemService(NotificationManager.class);
+        notifications.createNotificationChannel(channel);
+        NotificationChannel messages = new NotificationChannel(MESSAGE_CHANNEL, "동행길 상황 메시지", NotificationManager.IMPORTANCE_HIGH);
+        messages.setSound(null, null);
+        messages.enableVibration(false);
+        notifications.createNotificationChannel(messages);
+        messageVehicleSource = new VehicleParkingSource(this, messageParking, () -> {
+            if (!messageParking.messagesAllowed(SystemClock.elapsedRealtime())) dismissMessageAlert();
+        });
     }
     public HttpSharingTransport transport() { return transport; }
     public String endpoint() { return endpoint; }
@@ -62,6 +80,7 @@ public final class SharingService extends Service {
         if(active()){status="공유 중에는 서버를 바꿀 수 없습니다. 먼저 공유를 중지하세요.";emit();return;}
         HttpSharingTransport candidate = new HttpSharingTransport(address,vehicleName);
         if(transport!=null)transport.close();transport=candidate;endpoint=address;name=vehicleName;status="";
+        receivedMessages.clear();
         transport.setListener(snapshot->{
             if(ending)return;
             if(lifetime.phase()==SharingLifetime.Phase.STARTING){
@@ -72,6 +91,7 @@ public final class SharingService extends Service {
             }
             if(snapshot.connection==Connection.CONNECTED)disconnectedAt=-1;
             else if(active() && disconnectedAt<0)disconnectedAt=SystemClock.elapsedRealtime();
+            alertIncomingMessage(snapshot);
             emit();
         });transport.connect();emit();
     }
@@ -96,6 +116,11 @@ public final class SharingService extends Service {
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
         if(intent==null){endSharing("자동 공유 재시작은 지원하지 않습니다.",true);return START_NOT_STICKY;}
+        if (DISMISS_MESSAGE.equals(intent.getAction())) {
+            dismissMessageAlert();
+            if (!active()) stopSelf();
+            return START_NOT_STICKY;
+        }
         if(STOP.equals(intent.getAction())){endSharing("공유 중지됨",false);return START_NOT_STICKY;}
         if(!START.equals(intent.getAction())){if(!active())stopSelf();return START_NOT_STICKY;}
         boolean eligible=armedParking!=null && armedParking.allowed(SystemClock.elapsedRealtime());
@@ -109,7 +134,7 @@ public final class SharingService extends Service {
             if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             else startForeground(NOTIFICATION,notification);
             foreground=true;disconnectedAt=-1;status="내비 등 다른 앱에서도 공유 유지 · 알림에서 중지 가능";
-            source.start();handler.post(ticker);transport.startSharing();emit();
+            messageVehicleSource.start();source.start();handler.post(ticker);transport.startSharing();emit();
         }catch(RuntimeException error){endSharing("위치 공유 서비스를 시작할 수 없습니다.",false);}
         return START_NOT_STICKY;
     }
@@ -123,6 +148,46 @@ public final class SharingService extends Service {
         if(Build.VERSION.SDK_INT>=31)builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
         return builder.build();
     }
+    private void alertIncomingMessage(Snapshot snapshot) {
+        if (snapshot.connection != Connection.CONNECTED) return;
+        Message newest = null;
+        for (Message message : snapshot.messages) {
+            if (message.senderId.equals(transport.userId()) || message.delivery != Delivery.DELIVERED
+                    || !receivedMessages.add(message.id)) continue;
+            if (receivedMessages.size() > 100) receivedMessages.remove(receivedMessages.iterator().next());
+            newest = message;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (newest == null || !foreground || !snapshot.sharing || !messageParking.messagesAllowed(now)
+                || now - lastMessageAlert < MESSAGE_ALERT_INTERVAL_MS) return;
+
+        Person sender = new Person.Builder().setName(newest.sender).build();
+        Person self = new Person.Builder().setName(name).build();
+        PendingIntent dismiss = PendingIntent.getService(this, MESSAGE_NOTIFICATION,
+                new Intent(this, SharingService.class).setAction(DISMISS_MESSAGE),
+                PendingIntent.FLAG_IMMUTABLE);
+        android.os.Bundle readExtras = new android.os.Bundle();
+        readExtras.putBoolean("android.support.action.showsUserInterface", false);
+        Notification.Action read = new Notification.Action.Builder(null, "알림 닫기", dismiss)
+                .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MARK_AS_READ)
+                .addExtras(readExtras).build();
+        Notification notification = new Notification.Builder(this, MESSAGE_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setCategory(Notification.CATEGORY_MESSAGE)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setContentTitle(newest.sender)
+                .setContentText(newest.kind.label)
+                .setStyle(new Notification.MessagingStyle(self).addMessage(newest.kind.label, newest.sentAtMillis, sender))
+                .addAction(read)
+                .setTimeoutAfter(MESSAGE_VISIBLE_MS)
+                .build();
+        lastMessageAlert = now;
+        getSystemService(NotificationManager.class).notify(MESSAGE_NOTIFICATION, notification);
+    }
+    private void dismissMessageAlert() {
+        getSystemService(NotificationManager.class).cancel(MESSAGE_NOTIFICATION);
+    }
+
     private final Runnable ticker=new Runnable(){public void run(){
         if(!active())return;
         long now=SystemClock.elapsedRealtime();
@@ -137,7 +202,7 @@ public final class SharingService extends Service {
     public void leaveGroup() { endSharing("그룹에서 나갔습니다.",true); }
     private void endSharing(String reason,boolean leave) {
         if(ending)return;ending=true;
-        lifetime.stop();armedParking=null;handler.removeCallbacksAndMessages(null);source.stop();disconnectedAt=-1;
+        lifetime.stop();armedParking=null;handler.removeCallbacksAndMessages(null);source.stop();messageVehicleSource.stop();dismissMessageAlert();disconnectedAt=-1;
         if(transport!=null){transport.publish(null);if(leave)transport.leaveGroup();else transport.stopSharing();}
         if(foreground){stopForeground(STOP_FOREGROUND_REMOVE);foreground=false;}
         status=reason;stopSelf();
@@ -151,6 +216,7 @@ public final class SharingService extends Service {
     @Override public void onTaskRemoved(Intent rootIntent) { endSharing("앱 작업 종료",true);super.onTaskRemoved(rootIntent); }
     @Override public void onDestroy() {
         lifetime.stop();handler.removeCallbacksAndMessages(null);source.stop();
+        messageVehicleSource.stop();dismissMessageAlert();
         if(transport!=null){transport.close();transport=null;}
         if(foreground)stopForeground(STOP_FOREGROUND_REMOVE);
         observers.clear();super.onDestroy();
