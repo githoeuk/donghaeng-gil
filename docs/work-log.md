@@ -711,3 +711,10 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 내비로 전환해 같은 목적지의 안내가 계속됨을 확인했다. 동행길로 돌아와 ‘가상 체험 이어가기’를 누르자 같은 팀원 3대와 수신 메시지, ‘받은 메시지 확인’ 버튼이 남아 있었다. 메인에서 종료를 확정하니 팀원과 이어가기 버튼이 사라지고 실제 목적지는 유지됐다. 새 체험을 열어 그룹 미참여 및 메시지 없음 상태를 확인했다.
 - 화면 자동 수집 도중 일부 UIAutomator 캡처가 idle 대기 시간 초과로 재시도가 필요했다. 앱·AVD·경로를 재시작하지 않고 진행을 완료했다. 사용자 흐름에서 앱 수정이 필요한 문제는 재현되지 않았다. 시험 경로 종료와 기존 GPS 복원을 확인한 뒤 AVD를 종료했다.
 - 증거는 Git 제외 `.gradle/rehearsal-*`에 보관했다. 주요 화면은 `vehicle`, `main-active`, `nav-return`, `resumed`, `ended`, `reset`이다. 이번 리허설은 Debug 런타임 검증이다.
+
+## 2026-11-08 — 시연용 메인 화면 시각 개선
+
+- 메인 화면의 제목과 카드 라벨을 강조하고 Pleos 연결 상태를 내 차량 제목 옆에 배치했다. 위치·목적지 카드는 남색, 예상 도착과 실제 동행 공유는 청록색, 가상 체험은 보라색 계열로 구분했다.
+- 가상 체험의 시작·이어가기 버튼을 밝은 색으로 강조하고 종료는 테두리 버튼으로 구분했다. 메인 버튼의 최소 터치 높이를 52dp로 맞추고 포커스·비활성 표시를 적용했다. 가상 상황 메시지 버튼 세 개는 한 줄에서 같은 폭으로 배치했다.
+- 시연용 Pleos Connect v2.1.0에 standardDebug APK를 설치했다. 시작 전·공유 중 메인 화면에서 카드와 버튼을 확인했다. 가상 그룹과 팀원 3대 표시, 메인 종료 확인과 시작 상태 복귀를 검증했다. Virtual Console에서 D·22km/h에 시작 버튼이 비활성화되고 P·0km/h로 돌아오면 다시 활성화됐다.
+- standardDebug 빌드, submissionRelease·standardRelease Java 컴파일 및 상태 검사 189개가 통과했다. 런타임은 Debug에서 확인했다. Git 제외 캡처는 `.gradle/ui-polish-idle.png`, `.gradle/ui-polish-overview.png`, `.gradle/ui-polish-locked.png`에 있다.
