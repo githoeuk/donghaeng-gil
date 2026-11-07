@@ -669,3 +669,13 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 새 Debug APK 두 대에서 로컬 공유를 시작하고 수신 기기에 Pleos 시험 경로 안내를 켰다. 양쪽 D·22km/h에서 첫 알림에 SetupCar와 휴게소 들를게요가 표시됐다. 시스템 로그상 게시 후 3.003초에 자동 제거됐다.
 - 두 번째 알림에 SetupCar와 잠시 기다려 주세요가 표시됐다. 알림 닫기를 터치하자 게시 후 2.606초에 앱 취소 이벤트가 기록됐다. 자동·터치 닫힘 모두 수신기가 D·22km/h인 동안 같은 경로선과 80m 회전 안내가 다시 표시됐고 내비가 전면에 유지됐다. 팝업이 떠 있는 동안에는 상단 회전 안내가 일부 가려진다.
 - Git 제외 증거는 .gradle/short-alert-auto-during.png, short-alert-auto-after.png, short-alert-tap-before.png, short-alert-tap-after.png다. Debug APK 빌드와 두 Release 변형 Java 컴파일에 성공했다. 시험 후 두 기기를 P·0km/h로 복귀시키고 시험 경로와 공유를 종료했다.
+
+## 2026-11-07 — 최신 제출 변형에서 가상 체험 복귀·초기화 검증
+
+- 소스 `ce89d2f`에서 `assembleSubmissionRelease` 성공. 임시 검증 키로 서명했고 빌드 후 키를 제거했다. 버전 0.1(versionCode 1), v2 서명 검증 통과, 비디버그 구성, 가상 체험 Activity 비공개 및 Debug 진단·알림 시험 진입점 제외를 확인했다. 검증 APK는 Git 제외 `.gradle/latest-submission-validation.apk`에 보관했다.
+- APK SHA-256 `3C03D9335397CB3198620F300682D508668CD9F95ADDA59593F91D0BECBE38AF`, 검증 인증서 SHA-256 `61845b0b7c79492490b1bf6a0a5fc99861ea30a9e685a83aae09d7d7f94d00b0`. 최종 제출용 서명은 별도다.
+- 별도 Pleos Connect v2.1.0 AVD에 설치했다. Android 사용자 10에서 시험 위치·속도 읽기 권한을 부여하고 시험 GPS를 입력했다. 메인 화면에서 Pleos 연결, 차량 GPS 정확도 ±5m와 최신 갱신, P·속도 0·플랫폼 제한 없음, 목적지 미설정 안내를 확인했다. 새 AVD에서 내비 자체의 주변 검색은 빈 결과를 반환했다. 이 실행에서 동행길은 주소 확인 대기와 목적지 미설정 안내를 표시했다.
+- 정차 상태에서 가상 차량 체험 안내 → 새 체험 시작 → 그룹 만들기 → 가상 차량 참여 승인 → 공유 동의 순으로 진행했다. 그룹 DEMO42의 공유 중 상태와 가상 차량 3대의 위치·도착 정보를 확인했다. 메인으로 돌아가 팀원 요약을 확인한 뒤 Pleos 내비를 전면으로 열었다. 동행길로 복귀했을 때 같은 그룹과 팀원이 남아 있었고 ‘가상 체험 이어가기’로 공유 중인 화면을 다시 열 수 있었다.
+- 가상 수신 메시지를 한 건 추가한 뒤 ‘체험 종료’를 눌렀다. 메인에서 팀원 요약과 이어가기 버튼이 사라졌다. 다시 새 체험을 시작했을 때 그룹 미참여·공유 중지였고 차량과 메시지가 비어 있었다. 이 흐름에서 앱 소스 변경은 없었다.
+- 화면 증거는 Git 제외 `.gradle/latest-release-*.xml`에 저장했다. 주요 파일은 `vehicle`, `active`, `nav-away`, `returned`, `resumed`, `before-end`, `ended`, `reset`이다.
+- 실제 경로는 이전 검증용 AVD의 읽기 전용 인스턴스에도 같은 APK를 설치해 재검증했다. Pleos 내비의 최근 목적지에서 스타벅스 판교아이스퀘어점을 선택하고 안내를 시작했다. 처음에는 시험 GPS와 내비 위치가 844m 달라 동행길이 도착 시각 대신 위치 확인 필요를 표시했다. 시험 GPS를 내비 기준점과 일치시킨 뒤 현재 위치 ‘수정구 시흥동’, 목적지 ‘스타벅스 판교아이스퀘어점’, 상세주소 ‘경기도 성남시 수정구 창업로 18’, 약 2분·23:05 도착 예정·330m 남음을 같은 화면에서 확인했다. 증거는 `.gradle/latest-release-live-route.xml`과 `.gradle/latest-release-live-route.png`다. 시험용 인스턴스를 종료했고 기존 두 AVD는 그대로 두었다.
