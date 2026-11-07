@@ -52,6 +52,8 @@ public final class GroupSharingActivity extends Activity {
     private Button settingsToggle,connectButton,createGroup,joinGroup,startSharing;
     private boolean settingsExpanded;
     private static final String SETTINGS = "sharing_connection_settings";
+    private static final String DISPLAY_NAME = "vehicle_name"; // Preserve names saved by earlier versions.
+    private static final String ACCOUNT_DISPLAY_NAME = "account_display_name";
     private Button copyInvite;
     private LinearLayout messages, management;
     private String renderedManagement="initial";
@@ -66,15 +68,18 @@ public final class GroupSharingActivity extends Activity {
         settings=getSharedPreferences(SETTINGS,MODE_PRIVATE);
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root=column(); root.setPadding(28,18,28,24); scroll.addView(root);
-        root.addView(text("동행길 · 실제 서버 공유",26));
-        root.addView(text("모의 모드가 아닙니다. 공유 시작 후 내비 등 다른 앱에서도 실제 위치·목적지·ETA를 전송합니다. 중지 버튼이나 지속 알림에서 종료하세요.",16));
+        root.addView(text("동행길 · 동행 차량과 공유",26));
+        root.addView(text("공유를 시작하면 동행 차량이 내 위치·목적지·예상 도착 시간을 볼 수 있습니다. 내비를 보는 중에도 공유되며, 화면이나 알림에서 중지할 수 있습니다.",16));
         safety=text("차량 상태 확인 중",16);root.addView(safety);
         Button permissions=parkedButton("위치·차량 상태 권한",()->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,VehicleParkingSource.SPEED_PERMISSION},22));root.addView(permissions);
         root.addView(text("1. 연결 준비",20));
         settingsSummary=text("",16);root.addView(settingsSummary);
         LinearLayout setup=row();root.addView(setup);
-        setup.addView(text("차량 이름",18));
-        name=edit(settings.getString("vehicle_name","차량"),"차량 이름");
+        root.addView(text("동행자 이름은 이 기기에 저장되며 참여 승인 화면과 동행자 목록에 표시됩니다.",16));
+        setup.addView(text("동행자 이름",18));
+        // A future account integration can supply a default without replacing a saved choice.
+        String accountName = settings.getString(ACCOUNT_DISPLAY_NAME, "").trim();
+        name=edit(settings.getString(DISPLAY_NAME, accountName.length() <= 24 ? accountName : ""), "동행자 이름");
         name.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(24)});
         setup.addView(name,new LinearLayout.LayoutParams(0,-2,1));parkedControls.add(name);
         connectButton=parkedButton("서버 연결",this::connect);setup.addView(connectButton);
@@ -133,10 +138,10 @@ public final class GroupSharingActivity extends Activity {
         if(!parking.allowed(SystemClock.elapsedRealtime()) || setupLocked())return false;
         try{
             String address=RelayEndpoint.validate(endpoint.getText().toString(),BuildConfig.DEBUG);
-            String vehicleName=name.getText().toString().trim();
-            if(vehicleName.isEmpty() || vehicleName.length()>24)throw new IllegalArgumentException("차량 이름은 1~24자로 입력하세요.");
-            settings.edit().putString("endpoint",address).putString("vehicle_name",vehicleName).apply();
-            endpoint.setText(address);name.setText(vehicleName);
+            String displayName=name.getText().toString().trim();
+            if(displayName.isEmpty() || displayName.length()>24)throw new IllegalArgumentException("동행자 이름은 1~24자로 입력하세요.");
+            settings.edit().putString("endpoint",address).putString(DISPLAY_NAME,displayName).apply();
+            endpoint.setText(address);name.setText(displayName);
             updateText(settingsFeedback,"설정을 저장했습니다. 서버 연결을 눌러 연결하세요.");
             if(announce)android.widget.Toast.makeText(this,"설정을 저장했습니다.",android.widget.Toast.LENGTH_SHORT).show();
             render();return true;
@@ -196,7 +201,7 @@ public final class GroupSharingActivity extends Activity {
         String address=relay!=null?service.endpoint():endpoint.getText().toString().trim();
         updateText(settingsSummary,address.isEmpty()?"공유 서버가 아직 설정되지 않았습니다. 연결 설정에서 서버 주소를 지정하세요.":
             (relay!=null?"연결 서버: ":"사용할 서버: ")+address+(BuildConfig.DEBUG && address.equals("http://10.0.2.2:8787")?" · 에뮬레이터 로컬 시험용":"")
-            +(locked?"\n그룹 나가기 후 연결 설정을 바꿀 수 있습니다.":"\n차량 이름을 확인하고 서버 연결을 누르세요."));
+            +(locked?"\n그룹 나가기 후 연결 설정을 바꿀 수 있습니다.":"\n동행자 이름을 확인하고 서버 연결을 누르세요."));
         boolean connected=relay!=null && relay.snapshot().connection==Connection.CONNECTED;
         boolean grouped=relay!=null && !relay.snapshot().groupId.isEmpty();
         boolean pending=relay!=null && relay.isApprovalPending();
@@ -207,7 +212,7 @@ public final class GroupSharingActivity extends Activity {
         if(relay==null){
             copyInvite.setEnabled(false);
             updateText(status,service==null?"공유 서비스 연결 대기":"서버 연결 전 · 위치 공유 중지");
-            updateText(groupHelp,"1단계 · 차량 이름을 확인하고 서버 연결을 누르세요. 두 차량은 같은 서버를 사용해야 합니다. 내비에서 목적지를 설정하면 ETA도 공유할 수 있습니다.");
+            updateText(groupHelp,"1단계 · 동행자 이름을 확인하고 서버 연결을 누르세요. 두 차량은 같은 서버를 사용해야 합니다. 내비에서 목적지를 설정하면 ETA도 공유할 수 있습니다.");
             updateText(vehicles,"공유된 차량 정보가 없습니다.");
             renderManagement(parked);
             if(!"disconnected".equals(renderedMessages)){

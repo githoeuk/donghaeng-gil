@@ -37,7 +37,7 @@ public final class HttpSharingTransport implements SharingTransport {
     private Snapshot current = new Snapshot("","","서버 연결 전 · 실제 위치 전송 중지",false,false,Connection.DISCONNECTED,new ArrayList<>(),new ArrayList<>());
     public HttpSharingTransport(String endpoint, String name) {
         this.endpoint = RelayEndpoint.validate(endpoint,BuildConfig.DEBUG);
-        if (name.trim().isEmpty() || name.length()>24) throw new IllegalArgumentException("차량 이름은 1~24자로 입력하세요.");
+        if (name.trim().isEmpty() || name.length()>24) throw new IllegalArgumentException("동행자 이름은 1~24자로 입력하세요.");
         this.name = name.trim(); handler.post(ticker);
     }
     public static final class AccessPerson {
