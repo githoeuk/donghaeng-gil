@@ -578,3 +578,11 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 동의창의 전송 범위와 실제 서버 주소를 확인했다. 취소 후 공유 중지 상태가 유지됐으며, 다시 열어 최종 확인한 뒤에만 참여자의 위치 공유 서비스가 시작됐다. 그룹장 화면에서 참여자는 공유 중, 그룹장 자신은 공유 중지로 표시됐다. 근거는 `two-peerflow-b-consent.xml`, `two-peerflow-b-cancel.xml`, `two-peerflow-b-sharing.xml`, `two-peerflow-a-peer-sharing.xml`이다.
 - 초대 코드가 비어 있는 참여자 상태 줄에서 빈 라벨을 숨겼다. Debug 재빌드 후 두 기기에서 요청·승인·동의·공유 시작을 다시 확인했다. 그룹장의 실제 초대 코드는 계속 표시됐고, 참여자 상태 줄은 '그룹 연결 · 서버 연결됨 · 내 위치 공유 중지'로 표시됐다. 그룹장이 나가자 참여자의 공유도 종료됐다. 최종 근거는 `two-peerflow-*-fixed-*.xml`이다.
 - 시험 종료 후 양쪽 공유 서비스의 포그라운드 상태 해제를 확인하고 두 에뮬레이터와 시험 중계를 종료했다. 증거는 Git 제외 `.gradle`에 보관했다. 이번 검증 범위는 로컬 HTTP 참여 흐름이며 주행 전환·ETA 정확도·외부 HTTPS는 별도다.
+
+## 2026-11-07 — 제출 변형 Release 설치 및 정차·주행 잠금 검증
+
+- 팀명 미정으로 임시 검증 키를 사용했다. 빌드에 환경변수 기반 Release 서명을 연결하고 서명 정보가 없을 때 패키징 가드가 실패하는 것을 확인했다. 검증용 키는 빌드 후 제거했다. 최종 키 보관·백업 절차는 제출 가이드에 기록했다.
+- submissionRelease 빌드 및 apksigner v2 검증을 통과했다. APK SHA-256은 CE465A1EABCB4CF4A5FF8E2A401846EC19ED321762D5064F8B9B50822D67BF45, 검증 인증서 SHA-256은 58e8e528b42b6a9c6b812005528d8cb755ee7b86201522a15b576860f661eb69다. 매니페스트에서 모의 시연 포함과 Debug 진단·알림 시험 진입점 제외를 확인했다.
+- 깨끗한 전용 Pleos 에뮬레이터에 설치했다. 최초 권한 미부여 상태의 안내 및 시연 잠금, 시험 권한 부여 후 SDK 위치 주소와 내비 목적지명·상세 주소·약 3분/330m 표시를 확인했다. GPS는 에뮬레이터 시험 좌표이며, 목적지와 경로는 Pleos 내비 UI에서 설정했다.
+- 정차 중 모의 그룹을 만들고 가상 차량 3대 표시를 확인했다. Virtual Console에서 P→D(속도 0)로 전환하자 시연이 잠기고 시작 버튼이 비활성화됐다. P 복귀 후 다시 시작할 수 있었으며 이전 그룹과 차량이 복원되지 않았다. 이 검증의 주행 조건은 D 기어 전환이다.
+- 증거는 `.gradle`의 `release-live.png`, `two-release-demo-active.xml`, `two-release-drive-locked.xml`, `two-release-park-fresh.xml`에 있다. 검증용 APK를 `.gradle/donghaeng-release-validation.apk`로 옮기고 전용 에뮬레이터를 종료했다.
