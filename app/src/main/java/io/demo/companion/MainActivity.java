@@ -4,14 +4,17 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -23,6 +26,12 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final int LOCATION_REQUEST = 20, VEHICLE_REQUEST = 21;
+    private static final int TEXT = 0xFFF0F5FC;
+    private static final int MUTED = 0xFFB6C5D4;
+    private static final int TEAL = 0xFF79E7D0;
+    private static final int LAVENDER = 0xFFE2D5FF;
+    private static final int CARD = 0xFF192A3A;
+    private static final int BORDER = 0xFF344A5E;
     private final ParkingState parking = new ParkingState();
     private VehicleParkingSource parkingSource;
     static java.util.function.Supplier<SharingModels.Snapshot> demoOverview;
@@ -47,19 +56,26 @@ public class MainActivity extends Activity {
         super.onCreate(saved);
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.rgb(14, 24, 34));
+        scroll.setBackgroundColor(0xFF101C28);
         LinearLayout root = column(); root.setPadding(dp(32), dp(24), dp(32), dp(24));
         scroll.addView(root);
-        TextView brand = text("동행길", 32, Color.WHITE); brand.setTypeface(null, Typeface.BOLD);
+        TextView brand = text("동행길", 34, TEXT);
+        brand.setTypeface(null, Typeface.BOLD);
         root.addView(brand);
-        root.addView(text("따로 출발해도, 함께 도착하다", 17, Color.rgb(156, 178, 192)));
-        TextView vehicleHeading = text("내 차량 정보", 24, Color.WHITE);
+        root.addView(text("따로 출발해도, 함께 도착하다", 17, MUTED));
+
+        LinearLayout vehicleHeader = new LinearLayout(this);
+        vehicleHeader.setGravity(Gravity.CENTER_VERTICAL);
+        vehicleHeader.setPadding(0, dp(18), 0, dp(10));
+        TextView vehicleHeading = text("내 차량 정보", 24, TEXT);
         vehicleHeading.setTypeface(null, Typeface.BOLD);
-        vehicleHeading.setPadding(0, dp(18), 0, 0);
-        root.addView(vehicleHeading);
-        connection = text("Pleos 연결 중", 16, Color.rgb(101, 222, 201));
-        connection.setPadding(0, dp(4), 0, dp(10));
-        root.addView(connection);
+        vehicleHeading.setAccessibilityHeading(true);
+        vehicleHeader.addView(vehicleHeading, new LinearLayout.LayoutParams(0, -2, 1));
+        connection = text("Pleos 연결 중", 16, TEAL);
+        connection.setPadding(dp(12), dp(5), dp(12), dp(5));
+        connection.setBackground(surface(0xFF183A3B, 0xFF335B58, 12));
+        vehicleHeader.addView(connection);
+        root.addView(vehicleHeader);
 
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         root.addView(row, new LinearLayout.LayoutParams(-1, -2));
@@ -75,13 +91,15 @@ public class MainActivity extends Activity {
         destination = text("내비 정보를 확인하고 있습니다", 23, Color.WHITE); destinationCard.addView(destination);
         destinationDetail = text("", 16, Color.rgb(169, 190, 203)); destinationCard.addView(destinationDetail);
 
-        LinearLayout etaCard = card("예상 도착");
+        LinearLayout etaCard = card("예상 도착", 0xFF183439, 0xFF36615E, TEAL);
         LinearLayout.LayoutParams etaLayout = new LinearLayout.LayoutParams(-1, -2); etaLayout.setMargins(0, dp(16), 0, 0);
         root.addView(etaCard, etaLayout);
-        eta = text("연결 중", 36, Color.rgb(101, 222, 201)); eta.setTypeface(null, Typeface.BOLD); etaCard.addView(eta);
+        eta = text("연결 중", 36, TEAL); eta.setTypeface(null, Typeface.BOLD); etaCard.addView(eta);
         etaDetail = text("", 18, Color.rgb(188, 206, 217)); etaCard.addView(etaDetail);
         LinearLayout actions = new LinearLayout(this);
-        groupButton = button("실제 동행 공유", () -> startActivity(new Intent(this, GroupSharingActivity.class)));
+        actions.setPadding(0, dp(10), 0, dp(4));
+        groupButton = button("실제 동행 공유", () -> startActivity(new Intent(this, GroupSharingActivity.class)),
+                0xFF20464B, 0xFF426B6C, TEAL);
         groupButton.setEnabled(false);
         actions.addView(groupButton);
         actions.addView(button("다시 연결", () -> { source.stop(); source.start(); }));
@@ -94,20 +112,22 @@ public class MainActivity extends Activity {
         vehiclePermission = button("차량 상태 접근 허용", () -> requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, VEHICLE_REQUEST));
         root.addView(vehiclePermission);
         if (BuildConfig.HAS_SHARING_DEMO) {
-            demoCard = card("가상 체험", Color.rgb(37, 34, 59));
+            demoCard = card("가상 체험", 0xFF29243D, 0xFF574C72, LAVENDER);
             demoCard.addView(text("가상 팀원의 위치·도착 시간·메시지를 체험할 수 있어요. 체험 데이터는 외부로 보내지 않습니다.",
                     17, Color.rgb(207, 198, 233)));
             demoStatus = text("", 18, Color.WHITE);
             demoCard.addView(demoStatus);
 
             LinearLayout demoActions = new LinearLayout(this);
-            demoButton = demoAction("가상 체험 시작", () -> {
+            demoActions.setPadding(0, dp(6), 0, dp(4));
+            demoButton = button("가상 체험 시작", () -> {
                 if (parking.allowed(SystemClock.elapsedRealtime())) openDemo();
                 else renderParking();
-            });
+            }, LAVENDER, LAVENDER, 0xFF261C38);
+            demoButton.setTypeface(null, Typeface.BOLD);
             demoButton.setEnabled(false);
             demoActions.addView(demoButton);
-            demoEndButton = demoAction("체험 종료", this::confirmDemoEnd);
+            demoEndButton = button("체험 종료", this::confirmDemoEnd, 0xFF332944, 0xFF665681, LAVENDER);
             demoEndButton.setVisibility(View.GONE);
             demoActions.addView(demoEndButton);
             demoCard.addView(demoActions);
@@ -116,12 +136,15 @@ public class MainActivity extends Activity {
             demoCard.addView(demoVehicles);
             demoQuickMessages = new LinearLayout(this);
             for (SharingModels.MessageKind kind : SharingModels.MessageKind.SEND_PRESETS) {
-                demoQuickMessages.addView(button(kind.label, () -> {
+                Button quickMessage = button(kind.label, () -> {
                     if (demoSend != null && parking.messagesAllowed(SystemClock.elapsedRealtime())) {
                         demoSend.accept(kind);
                         renderDemoStatus(parking.allowed(SystemClock.elapsedRealtime()));
                     }
-                }));
+                }, 0xFF332944, 0xFF665681, LAVENDER);
+                LinearLayout.LayoutParams quickLayout = new LinearLayout.LayoutParams(0, -1, 1);
+                quickLayout.setMarginEnd(dp(8));
+                demoQuickMessages.addView(quickMessage, quickLayout);
             }
             demoCard.addView(demoQuickMessages);
             LinearLayout.LayoutParams demoLayout = new LinearLayout.LayoutParams(-1, -2);
@@ -273,27 +296,52 @@ public class MainActivity extends Activity {
     }
     private LinearLayout column() { LinearLayout view = new LinearLayout(this); view.setOrientation(LinearLayout.VERTICAL); return view; }
     private LinearLayout card(String title) {
-        return card(title, Color.rgb(25, 41, 54));
+        return card(title, CARD, BORDER, MUTED);
     }
-    private LinearLayout card(String title, int color) {
-        LinearLayout view = column(); view.setPadding(dp(22), dp(18), dp(22), dp(20));
-        GradientDrawable background = new GradientDrawable(); background.setColor(color); background.setCornerRadius(dp(16)); view.setBackground(background);
-        TextView label = text(title, 17, Color.rgb(156, 178, 192));
-        label.setPadding(0, 0, 0, dp(8));
+    private LinearLayout card(String title, int fill, int border, int labelColor) {
+        LinearLayout view = column();
+        view.setPadding(dp(22), dp(16), dp(22), dp(17));
+        view.setBackground(surface(fill, border, 16));
+        TextView label = text(title, 19, labelColor);
+        label.setTypeface(null, Typeface.BOLD);
+        label.setPadding(0, 0, 0, dp(6));
         view.addView(label);
         return view;
     }
-    private Button demoAction(String label, Runnable action) {
-        Button view = button(label, action);
-        view.setTextSize(18);
-        view.setMinHeight(dp(56));
-        return view;
+    private GradientDrawable surface(int fill, int border, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(dp(radius));
+        drawable.setStroke(dp(1), border);
+        return drawable;
     }
     private TextView text(String value, int size, int color) {
         TextView view = new TextView(this); view.setText(value); view.setTextSize(size); view.setTextColor(color); view.setPadding(0, dp(4), 0, dp(5)); return view;
     }
     private Button button(String label, Runnable action) {
-        Button view = new Button(this); view.setText(label); view.setAllCaps(false); view.setOnClickListener(v -> action.run()); return view;
+        return button(label, action, 0xFF24364A, BORDER, TEXT);
+    }
+    private Button button(String label, Runnable action, int fill, int border, int foreground) {
+        Button view = new Button(this);
+        view.setText(label);
+        view.setTextSize(17);
+        view.setAllCaps(false);
+        view.setMinHeight(dp(52));
+        view.setMinimumWidth(0);
+        view.setMinWidth(0);
+        int[] disabled = {-android.R.attr.state_enabled};
+        view.setTextColor(new ColorStateList(new int[][]{disabled, {}}, new int[]{0xFF9AA8BA, foreground}));
+        StateListDrawable background = new StateListDrawable();
+        background.addState(disabled, surface(0xFF273142, 0xFF364254, 12));
+        background.addState(new int[]{android.R.attr.state_focused}, surface(fill, TEXT, 12));
+        background.addState(new int[]{}, surface(fill, border, 12));
+        view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x337D90AD), background, null));
+        view.setPadding(dp(14), dp(6), dp(14), dp(6));
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-2, -2);
+        layout.setMarginEnd(dp(8));
+        view.setLayoutParams(layout);
+        view.setOnClickListener(v -> action.run());
+        return view;
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }
