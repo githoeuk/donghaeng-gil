@@ -718,3 +718,12 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 가상 체험의 시작·이어가기 버튼을 밝은 색으로 강조하고 종료는 테두리 버튼으로 구분했다. 메인 버튼의 최소 터치 높이를 52dp로 맞추고 포커스·비활성 표시를 적용했다. 가상 상황 메시지 버튼 세 개는 한 줄에서 같은 폭으로 배치했다.
 - 시연용 Pleos Connect v2.1.0에 standardDebug APK를 설치했다. 시작 전·공유 중 메인 화면에서 카드와 버튼을 확인했다. 가상 그룹과 팀원 3대 표시, 메인 종료 확인과 시작 상태 복귀를 검증했다. Virtual Console에서 D·22km/h에 시작 버튼이 비활성화되고 P·0km/h로 돌아오면 다시 활성화됐다.
 - standardDebug 빌드, submissionRelease·standardRelease Java 컴파일 및 상태 검사 189개가 통과했다. 런타임은 Debug에서 확인했다. Git 제외 캡처는 `.gradle/ui-polish-idle.png`, `.gradle/ui-polish-overview.png`, `.gradle/ui-polish-locked.png`에 있다.
+
+## 2026-11-08 — 최신 메인 UI 제출용 Release 검증
+
+- 소스 `d58ec47`에서 `assembleSubmissionRelease`로 버전 0.1(versionCode 1)을 패키징했다. 임시 검증 키로 서명해 apksigner v2 검증을 통과했고 키 파일은 제거했다. APK SHA-256은 `2E2D1BFFD6BCDF3D32D484CE7ECB8956CC89996C3A0EA930B666908214241A6A`, 검증 인증서 SHA-256은 `df61e3e189383a27e6178687730ca6a85392d6e81e6538def038ffb6e80063c4`다. Git 제외 APK는 `.gradle/release-ui-validation.apk`에 보관했다.
+- aapt로 비디버그 APK, 가상 체험 Activity 비공개, Debug 진단·알림 시험 Activity 제외를 확인했다. 별도 Pleos Connect v2.1.0 AVD에 새로 설치했다. 최신 남색·청록·보라색 카드 배치를 확인했고, 메인 버튼 줄에는 실제 동행 공유와 다시 연결만 표시됐다.
+- 에뮬레이터 GPS를 내비 기준점 37.4127212, 127.094681에 맞추고 Pleos 내비에서 `Starbucks`를 검색해 스타벅스 성남모란DT점으로 안내를 시작했다. 동행길에 현재 위치 ‘수정구 시흥동’, 목적지명과 상세주소 ‘경기도 성남시 중원구 둔촌대로 131’, 약 12분·06:51 도착 예정·5.8km 남음이 함께 표시됐다.
+- 정차 중 가상 그룹 생성·승인·공유 동의를 진행해 팀원 3대와 수신 메시지를 만들었다. Pleos 내비에서 같은 경로가 유지되는 것을 확인하고 앱으로 돌아와 이어가기를 눌렀다. 기존 수신 메시지와 ‘받은 메시지 확인’ 버튼이 유지됐다.
+- 첫 D·22km/h 시험에서 이어가기·종료가 회색으로 잠긴 화면을 캡처한 뒤 ADB 연결이 끊겼다. 전용 AVD를 재부팅해 같은 APK에서 재시험했다. D·22km/h에서 메인 이어가기·종료가 모두 비활성화됐고, P·0km/h로 복귀하자 두 버튼이 활성화되면서 팀원 3대가 유지됐다. 종료를 확정하면 이어가기와 팀원 요약이 사라졌고 새 체험은 그룹 미참여·메시지 없음 상태였다.
+- 정차 상태에서 검증 AVD를 종료했다. 화면 증거는 Git 제외 `.gradle/release-ui-*`의 `vehicle`, `overview`, `resumed`, `lock-observed`, `locked-retry`, `park`, `ended`, `reset`에 있다. 앱 소스 수정 없이 검증 기록만 추가했다.
