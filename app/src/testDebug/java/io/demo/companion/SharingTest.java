@@ -51,6 +51,28 @@ public final class SharingTest {
         mock.startSharing(); mock.close(); clock.now += 5000; mock.tick(); mock.createGroup();
         expect(mock.snapshot().groupId.isEmpty(),"closed transport cannot repopulate state");
 
+        MockSharingTransport overviewMock = new MockSharingTransport(clock);
+        overviewMock.createGroup();
+        overviewMock.startSharing();
+        overviewMock.send(MessageKind.WAIT);
+        clock.now += 16000;
+        Snapshot overview = overviewMock.refreshOverview();
+        expect(!overview.vehicles.get(0).stale(clock.now), "overview refreshes vehicles after inactivity");
+        expect(overview.messages.get(0).delivery == Delivery.PENDING, "overview does not advance message delivery");
+
+        MockSharingTransport receiver = new MockSharingTransport(clock);
+        receiver.createGroup();
+        receiver.startSharing();
+        receiver.receiveExampleMessage();
+        Message incoming = receiver.snapshot().messages.get(0);
+        expect(incoming.sender.equals("모의 차량 나") && incoming.delivery == Delivery.DELIVERED,
+                "fictional peer initiates a message without a local send");
+        receiver.acknowledge(incoming.id);
+        expect(receiver.snapshot().messages.get(0).delivery == Delivery.ACKNOWLEDGED, "incoming message can be acknowledged");
+        receiver.disconnect();
+        receiver.receiveExampleMessage();
+        expect(receiver.snapshot().messages.size() == 1, "offline peer cannot deliver an example");
+
         SharingStore store = new SharingStore(); long token = store.enter("group-a","code"); store.connect(true); store.start();
         expect(store.vehicle(token,vehicle("a",2,1000)),"first inbound version accepted");
         expect(!store.vehicle(token,vehicle("a",1,2000)),"out-of-order position rejected");

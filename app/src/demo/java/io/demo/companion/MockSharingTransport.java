@@ -26,7 +26,7 @@ public final class MockSharingTransport implements SharingTransport {
         if (closed) return;
         store.enter("demo-group", "DEMO42"); store.connect(true); frozen = false;
         pendingMessage = null; lastTick = -1;
-        notice = "데모 그룹 참여됨 · 공유 시작을 누르세요. 외부 전송 없음"; emit();
+        notice = "가상 그룹에 들어왔습니다. 체험 데이터는 외부로 전송하지 않습니다."; emit();
     }
     @Override public void startSharing() {
         if (closed) return;
@@ -56,12 +56,7 @@ public final class MockSharingTransport implements SharingTransport {
     public void tick() {
         if (closed) return;
         long now = clock.elapsed();
-        if (store.sharing() && store.connected() && !frozen && (lastTick < 0 || now - lastTick >= 5000)) {
-            lastTick = now; sequence++;
-            store.vehicle(store.token(), vehicle("demo-a", "모의 차량 가", "demo-cafe", "데모 카페", 720, sequence));
-            store.vehicle(store.token(), vehicle("demo-b", "모의 차량 나", "demo-cafe", "데모 카페", 900, sequence));
-            store.vehicle(store.token(), vehicle("demo-c", "모의 차량 다", "demo-rest", "데모 휴게소", 360, sequence));
-        }
+        refreshVehicles(now);
         if (pendingMessage != null && now - pendingAt >= 2000) store.delivery(pendingToken, pendingMessage, Delivery.DELIVERED);
         if (pendingMessage != null && now - pendingAt >= 4000) {
             store.delivery(pendingToken, pendingMessage, Delivery.ACKNOWLEDGED);
@@ -70,11 +65,29 @@ public final class MockSharingTransport implements SharingTransport {
         }
         emit();
     }
+    Snapshot refreshOverview() {
+        if (!closed) refreshVehicles(clock.elapsed());
+        return snapshot();
+    }
+    private void refreshVehicles(long now) {
+        if (store.sharing() && store.connected() && !frozen && (lastTick < 0 || now - lastTick >= 5000)) {
+            lastTick = now; sequence++;
+            store.vehicle(store.token(), vehicle("demo-a", "모의 차량 가", "demo-cafe", "데모 카페", 720, sequence));
+            store.vehicle(store.token(), vehicle("demo-b", "모의 차량 나", "demo-cafe", "데모 카페", 900, sequence));
+            store.vehicle(store.token(), vehicle("demo-c", "모의 차량 다", "demo-rest", "데모 휴게소", 360, sequence));
+        }
+    }
     private Vehicle vehicle(String id, String name, String destination, String destinationName, int seconds, long seq) {
         int step = (int) (seq % 12);
         return new Vehicle(id, name, 37.40 + step * 0.0001, 127.09, "가상시 동행로 " + (10 + step),
                 destination, destinationName, "가상시 만남로 " + (destination.equals("demo-cafe") ? 100 : 200),
                 seconds - step * 5, seconds * 5 - step * 20, seq, clock.wall(), clock.elapsed());
+    }
+    void receiveExampleMessage() {
+        if (closed || !store.inGroup() || !store.sharing() || !store.connected()) return;
+        store.message(store.token(), new Message("inbound-" + (++messageSequence),
+                "모의 차량 나", MessageKind.REST, clock.wall(), Delivery.DELIVERED));
+        emit();
     }
     @Override public void send(MessageKind kind) {
         if (closed) return;
