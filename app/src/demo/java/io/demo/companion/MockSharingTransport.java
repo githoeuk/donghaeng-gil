@@ -12,6 +12,7 @@ public final class MockSharingTransport implements SharingTransport {
     private boolean frozen, closed;
     private long lastTick = -1, sequence, messageSequence, pendingAt = -1, pendingToken;
     private String pendingMessage;
+    private boolean sentFromOverview;
     public MockSharingTransport(Clock clock) { this.clock = clock; }
     @Override public void setListener(Listener value) { listener = value; emit(); }
     @Override public Snapshot snapshot() { return store.snapshot(notice, true); }
@@ -66,7 +67,8 @@ public final class MockSharingTransport implements SharingTransport {
         emit();
     }
     Snapshot refreshOverview() {
-        if (!closed) refreshVehicles(clock.elapsed());
+        if (sentFromOverview && pendingMessage != null) tick();
+        else if (!closed) refreshVehicles(clock.elapsed());
         return snapshot();
     }
     private void refreshVehicles(long now) {
@@ -89,12 +91,18 @@ public final class MockSharingTransport implements SharingTransport {
                 "모의 차량 나", MessageKind.REST, clock.wall(), Delivery.DELIVERED));
         emit();
     }
+    void sendFromOverview(MessageKind kind) {
+        if (pendingMessage != null) return;
+        send(kind);
+        sentFromOverview = pendingMessage != null;
+    }
     @Override public void send(MessageKind kind) {
         if (closed) return;
         if (!store.inGroup() || !store.sharing() || !store.connected()) {
             notice = "보내지 못했습니다 · 그룹·공유·모의 연결을 확인하세요."; emit(); return;
         }
         if (pendingMessage != null) { notice = "앞선 모의 메시지의 결과를 기다려 주세요."; emit(); return; }
+        sentFromOverview = false;
         pendingToken = store.token(); pendingMessage = "demo-message-" + (++messageSequence); pendingAt = clock.elapsed();
         store.message(pendingToken, new Message(pendingMessage, "나 (모의)", kind, clock.wall(), Delivery.PENDING));
         notice = "모의 전송 대기 · 실제 상대에게 전송하지 않습니다."; emit();

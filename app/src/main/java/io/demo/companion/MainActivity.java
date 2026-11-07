@@ -26,6 +26,8 @@ public class MainActivity extends Activity {
     private final ParkingState parking = new ParkingState();
     private VehicleParkingSource parkingSource;
     static java.util.function.Supplier<SharingModels.Snapshot> demoOverview;
+    static java.util.function.Consumer<SharingModels.MessageKind> demoSend;
+    private LinearLayout demoQuickMessages;
     private TextView parkingLabel, demoStatus, demoVehicles;
     private LinearLayout demoCard;
     private Button demoButton, groupButton, vehiclePermission;
@@ -92,6 +94,16 @@ public class MainActivity extends Activity {
             demoVehicles = text("", 16, Color.rgb(188, 206, 217));
             demoCard.addView(demoStatus);
             demoCard.addView(demoVehicles);
+            demoQuickMessages = new LinearLayout(this);
+            for (SharingModels.MessageKind kind : SharingModels.MessageKind.SEND_PRESETS) {
+                demoQuickMessages.addView(button(kind.label, () -> {
+                    if (demoSend != null && parking.messagesAllowed(SystemClock.elapsedRealtime())) {
+                        demoSend.accept(kind);
+                        renderDemoStatus(parking.allowed(SystemClock.elapsedRealtime()));
+                    }
+                }));
+            }
+            demoCard.addView(demoQuickMessages);
             root.addView(demoCard);
             demoCard.setVisibility(View.GONE);
         }
@@ -113,7 +125,7 @@ public class MainActivity extends Activity {
             demoButton.setEnabled(allowed);
             demoButton.setText(demoOverview == null ? "가상 차량으로 체험 (정차 중)" : "가상 체험 이어가기");
         }
-        groupButton.setEnabled(allowed);
+        groupButton.setEnabled(allowed || parking.messagesAllowed(SystemClock.elapsedRealtime()));
         renderDemoStatus(allowed);
         parkingLabel.setText((allowed ? "정차 중에 이용할 수 있어요 · " : "정차 후 이용해 주세요 · ") + parking.description(SystemClock.elapsedRealtime()));
         vehiclePermission.setVisibility(parkingSource.hasPermission() ? View.GONE : View.VISIBLE);
@@ -142,6 +154,9 @@ public class MainActivity extends Activity {
         SharingModels.Snapshot snapshot = demoOverview == null ? null : demoOverview.get();
         demoCard.setVisibility(snapshot == null ? View.GONE : View.VISIBLE);
         if (snapshot == null) return;
+        boolean canSend = parking.messagesAllowed(SystemClock.elapsedRealtime())
+                && snapshot.sharing && snapshot.connection == SharingModels.Connection.CONNECTED;
+        demoQuickMessages.setVisibility(canSend ? View.VISIBLE : View.GONE);
         String group = snapshot.groupId.isEmpty() ? "참여한 그룹 없음" : "가상 동행 그룹 · " + snapshot.inviteCode;
         String sharing = snapshot.sharing ? "가상 팀원 정보 갱신 중" : "가상 공유 중지";
         demoStatus.setText(group + "\n" + sharing + " · "

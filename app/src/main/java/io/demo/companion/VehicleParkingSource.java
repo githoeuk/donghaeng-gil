@@ -62,11 +62,19 @@ public final class VehicleParkingSource {
                     if (!valid) { fail(captured, "차량 속성 미수신·사용 불가"); return; }
                     Object data = value.getValue();
                     if (value.getPropertyId() == VehiclePropertyIds.PERF_VEHICLE_SPEED
-                            && (!(data instanceof Float) || !Float.isFinite((Float)data) || ((Float)data) != 0f))
-                        fail(captured, "차량 움직임 감지 · 시연 잠김");
+                            && (!(data instanceof Float) || !Float.isFinite((Float)data)))
+                        fail(captured, "유효한 차량 속도를 받지 못했습니다");
+                    else if (value.getPropertyId() == VehiclePropertyIds.PERF_VEHICLE_SPEED && ((Float)data) != 0f) {
+                        state.unpark(captured, "차량 움직임 감지 · 설정 잠김");
+                        changed.run();
+                    }
                     if (value.getPropertyId() == VehiclePropertyIds.GEAR_SELECTION
-                            && (!(data instanceof Integer) || ((Integer)data) != VehicleGear.GEAR_PARK))
-                        fail(captured, "P 기어가 아닙니다 · 시연 잠김");
+                            && (!(data instanceof Integer) || ((Integer)data) <= 0))
+                        fail(captured, "유효한 기어 상태를 받지 못했습니다");
+                    else if (value.getPropertyId() == VehiclePropertyIds.GEAR_SELECTION && ((Integer)data) != VehicleGear.GEAR_PARK) {
+                        state.unpark(captured, "P 기어가 아닙니다 · 설정 잠김");
+                        changed.run();
+                    }
                 }
                 @Override public void onErrorEvent(int propertyId, int areaId) { if (epoch == connectionEpoch) fail(captured, "차량 속성 수신 오류"); }
             };

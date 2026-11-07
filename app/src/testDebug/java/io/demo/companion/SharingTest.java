@@ -60,6 +60,15 @@ public final class SharingTest {
         expect(!overview.vehicles.get(0).stale(clock.now), "overview refreshes vehicles after inactivity");
         expect(overview.messages.get(0).delivery == Delivery.PENDING, "overview does not advance message delivery");
 
+        MockSharingTransport quickSend = new MockSharingTransport(clock);
+        quickSend.createGroup();
+        quickSend.startSharing();
+        quickSend.sendFromOverview(MessageKind.WAIT);
+        clock.now += 4000;
+        Snapshot afterQuickSend = quickSend.refreshOverview();
+        expect(afterQuickSend.messages.get(0).delivery == Delivery.ACKNOWLEDGED, "quick message completes on overview");
+        expect(afterQuickSend.messages.size() == 2, "quick message generates one fictional reply");
+
         MockSharingTransport receiver = new MockSharingTransport(clock);
         receiver.createGroup();
         receiver.startSharing();

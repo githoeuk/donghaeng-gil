@@ -85,7 +85,7 @@ public final class SharingDemoActivity extends Activity {
         root.addView(text("가상 상황 메시지",18));
         root.addView(text("가상 차량과 메시지를 주고받는 연습입니다. 전달과 확인 상태도 체험에서 재현합니다.",16));
         LinearLayout messageActions = row(); root.addView(messageActions);
-        for (MessageKind kind : MessageKind.values()) messageActions.addView(demoButton(kind.label, () -> scenario.send(kind)));
+        for (MessageKind kind : MessageKind.SEND_PRESETS) messageActions.addView(demoButton(kind.label, () -> scenario.send(kind)));
         receiveExample = demoButton("가상 차량에서 메시지 받기", () -> scenario.receiveExampleMessage());
         root.addView(receiveExample);
         messages = column(); root.addView(messages);
@@ -125,6 +125,7 @@ public final class SharingDemoActivity extends Activity {
         scenario = null;
         approval = Approval.NONE;
         MainActivity.demoOverview = null;
+        MainActivity.demoSend = null;
         finish();
     }
     private void requestJoin() {
@@ -164,6 +165,7 @@ public final class SharingDemoActivity extends Activity {
             public long wall() { return System.currentTimeMillis(); }
         });
         MainActivity.demoOverview = scenario::refreshOverview;
+        MainActivity.demoSend = scenario::sendFromOverview;
         showActiveDemo();
     }
     private void showActiveDemo() {

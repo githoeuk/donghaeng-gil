@@ -55,7 +55,7 @@ public final class GroupSharingActivity extends Activity {
     private static final String DISPLAY_NAME = "vehicle_name"; // Preserve names saved by earlier versions.
     private static final String ACCOUNT_DISPLAY_NAME = "account_display_name";
     private Button copyInvite;
-    private LinearLayout messages, management;
+    private LinearLayout messages, management, quickMessages;
     private String renderedManagement="initial";
     private String renderedMessages="initial";
     private final List<View> parkedControls=new ArrayList<>();
@@ -104,8 +104,12 @@ public final class GroupSharingActivity extends Activity {
         group.addView(button("공유 중지",()->{if(service!=null)service.stopSharing();}));
         group.addView(button("그룹 나가기",()->{if(service!=null)service.leaveGroup();}));
         vehicles=text("서버에서 받은 차량 정보가 없습니다.",17);root.addView(vehicles);
-        LinearLayout actions=row();root.addView(actions);
-        for(MessageKind kind:MessageKind.values())actions.addView(parkedButton(kind.label,()->{if(relay!=null)relay.send(kind);}));
+        quickMessages = row(); root.addView(quickMessages);
+        for (MessageKind kind : MessageKind.SEND_PRESETS) {
+            quickMessages.addView(button(kind.label, () -> {
+                if (canSendPreset()) relay.send(kind);
+            }));
+        }
         management=column();root.addView(management);
         messages=column();root.addView(messages);
         root.addView(button("내 차량 화면으로",this::finish));
@@ -184,11 +188,20 @@ public final class GroupSharingActivity extends Activity {
         if(request==22){parkingSource.stop();parkingSource.start();}
         if(request==23)updateText(status,"알림 권한을 확인했습니다. 공유 시작을 다시 눌러 동의해 주세요.");
     }
+    private boolean canSendPreset() {
+        if (!parking.messagesAllowed(SystemClock.elapsedRealtime()) || relay == null) return false;
+        Snapshot snapshot = relay.snapshot();
+        return snapshot.sharing && snapshot.connection == Connection.CONNECTED && !snapshot.groupId.isEmpty();
+    }
     private void render(){
         if(safety==null)return;
         relay=service==null?null:service.transport();
         boolean parked=parking.allowed(SystemClock.elapsedRealtime());
-        updateText(safety,(parked?"정차 확인 · 설정·메시지 가능":"설정·메시지 잠김 · ")+parking.description(SystemClock.elapsedRealtime()));
+        boolean canSend = canSendPreset();
+        quickMessages.setVisibility(canSend ? View.VISIBLE : View.GONE);
+        updateText(safety, (parked ? "정차 확인 · 그룹 설정 가능" : "그룹 설정 잠김")
+                + (canSend ? " · 상황 메시지 전송 가능" : " · 상황 메시지 전송 대기")
+                + "\n" + parking.description(SystemClock.elapsedRealtime()));
         for(View control:parkedControls)control.setEnabled(parked);
         if(!parked && consent!=null && consent.isShowing())consent.dismiss();
         if(!parked){endpoint.clearFocus();name.clearFocus();code.clearFocus();android.view.inputmethod.InputMethodManager input=getSystemService(android.view.inputmethod.InputMethodManager.class);if(input!=null)input.hideSoftInputFromWindow(code.getWindowToken(),0);}
@@ -265,7 +278,7 @@ public final class GroupSharingActivity extends Activity {
             boolean own=message.senderId.equals(relay.userId());
             String delivery=message.delivery==Delivery.ACKNOWLEDGED?(own?"상대가 확인":"내가 확인"):message.delivery==Delivery.DELIVERED?"앱 수신 확인":"상대 앱 수신 대기";
             messages.addView(text(message.sender+(own?" (나)":"")+" · "+message.kind.label+" · "+delivery,17));
-            if(!own && message.delivery==Delivery.DELIVERED)messages.addView(parkedButton("메시지 확인",()->{if(relay!=null)relay.acknowledge(message.id);}));
+            if(!own && message.delivery==Delivery.DELIVERED)messages.addView(parkedButton("받은 메시지 확인",()->{if(relay!=null)relay.acknowledge(message.id);}));
         }
     }
     private void confirmManagement(String title,Runnable action){

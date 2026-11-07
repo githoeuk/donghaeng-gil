@@ -11,6 +11,7 @@ public final class SharingModels {
     public enum Delivery { PENDING, DELIVERED, ACKNOWLEDGED, FAILED }
     public enum MessageKind {
         REST("휴게소 들를게요"), WAIT("잠시 기다려 주세요"), GO("먼저 출발하세요"), OK("확인했어요");
+        static final List<MessageKind> SEND_PRESETS = Collections.unmodifiableList(java.util.Arrays.asList(REST, WAIT, GO));
         public final String label;
         MessageKind(String label) { this.label = label; }
     }

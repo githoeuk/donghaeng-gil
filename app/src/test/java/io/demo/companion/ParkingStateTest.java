@@ -51,6 +51,16 @@ public final class ParkingStateTest {
         state.sample(token,state.revision(),23000,23000,1f,8,true,true,1);
         expect(state.allowed(23000),"old listener samples ignored");
         state.fail(next,"permission revoked"); expect(!state.allowed(23000),"permission loss locks");
+        ParkingState driving = new ParkingState();
+        long driveSession = driving.open();
+        driving.sample(driveSession, driving.revision(), 24000, 24000, 5f, 8, true, true, 8);
+        expect(driving.messagesAllowed(24000) && !driving.allowed(24000), "driving allows presets when text is permitted");
+        expect(!driving.messagesAllowed(27001), "stale vehicle state locks presets");
+        driving.sample(driveSession, driving.revision(), 28000, 28000, 5f, 8, true, true, ParkingState.NO_TEXT_MESSAGE);
+        expect(!driving.messagesAllowed(28000), "platform text restriction locks presets");
+        driving.sample(driveSession, driving.revision(), 29000, 29000, 5f, 8, true, true, 8);
+        driving.fail(driveSession, "state unavailable");
+        expect(!driving.messagesAllowed(29000), "missing vehicle state locks presets");
         System.out.println("Passed " + checks + " parking-safety checks.");
     }
 }
