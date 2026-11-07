@@ -570,3 +570,11 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 서버 연결, 그룹 생성·참여 요청, 승인 대기, 각자 공유 동의, 공유 중 상태에 맞춰 안내한다. 한 대의 Pleos 에뮬레이터와 로컬 HTTP 중계에서 기본 서버 연결, 그룹장 생성, 설정 변경 잠금, 동의창의 실제 연결 주소, 새 동의 후 공유 시작·중지·탈퇴를 확인했다. 이번 실행의 기기 검증 범위는 그룹장 흐름이다. 근거는 `two-settings-final-connect.xml`, `two-settings-final-create.xml`, `two-settings-final-consent.xml`, `two-settings-final-sharing.xml`, `two-settings-final-left.xml`이다.
 - Virtual Console에서 P→D→P를 전환했다. D에서 설정 패널이 숨고 이름·서버 연결·초대 코드·그룹·메시지 조작이 잠겼으며 공유 중지·탈퇴·복귀는 가능했다. 동의창을 연 상태에서 D로 바꾸자 창이 닫혔고, P 복귀 뒤 다시 동의한 경우에만 공유가 시작됐다. 근거는 `two-settings-driving.xml`, `two-settings-final-consent-driving.xml`, `two-settings-final-return.xml`이다.
 - 연결 전 안내 영역의 반복 생성과 조건부 버튼의 중복 활성 전환을 정리했다. 이후 최종 APK에서 화면 XML을 수집할 수 있었다. Java 상태 검사 178개와 네 빌드 변형 구성 검사 104개를 통과했다. 화면 증거는 Git 제외 `.gradle`에 보관했다.
+
+## 2026-11-07 — 두 Pleos 에뮬레이터의 참여자 설정 흐름 검증
+
+- 최신 standardDebug를 emulator-5554(그룹장)와 emulator-5556(참여자)에 설치했다. 두 앱에서 기본 로컬 HTTP 중계에 연결하고, 그룹장이 만든 초대 코드를 참여자 화면에 입력해 요청했다.
+- 승인 대기 중 참여자에게 공유된 차량 정보가 없고 공유 시작과 연결 설정이 잠겼다. 그룹장 화면에는 승인 버튼이 표시됐다. 승인 직후에도 참여자의 공유는 중지 상태였다. 근거는 `two-peerflow-b-pending.xml`, `two-peerflow-a-pending.xml`, `two-peerflow-b-approved.xml`이다.
+- 동의창의 전송 범위와 실제 서버 주소를 확인했다. 취소 후 공유 중지 상태가 유지됐으며, 다시 열어 최종 확인한 뒤에만 참여자의 위치 공유 서비스가 시작됐다. 그룹장 화면에서 참여자는 공유 중, 그룹장 자신은 공유 중지로 표시됐다. 근거는 `two-peerflow-b-consent.xml`, `two-peerflow-b-cancel.xml`, `two-peerflow-b-sharing.xml`, `two-peerflow-a-peer-sharing.xml`이다.
+- 초대 코드가 비어 있는 참여자 상태 줄에서 빈 라벨을 숨겼다. Debug 재빌드 후 두 기기에서 요청·승인·동의·공유 시작을 다시 확인했다. 그룹장의 실제 초대 코드는 계속 표시됐고, 참여자 상태 줄은 '그룹 연결 · 서버 연결됨 · 내 위치 공유 중지'로 표시됐다. 그룹장이 나가자 참여자의 공유도 종료됐다. 최종 근거는 `two-peerflow-*-fixed-*.xml`이다.
+- 시험 종료 후 양쪽 공유 서비스의 포그라운드 상태 해제를 확인하고 두 에뮬레이터와 시험 중계를 종료했다. 증거는 Git 제외 `.gradle`에 보관했다. 이번 검증 범위는 로컬 HTTP 참여 흐름이며 주행 전환·ETA 정확도·외부 HTTPS는 별도다.
