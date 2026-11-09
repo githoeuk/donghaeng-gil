@@ -9,7 +9,7 @@
  <uses-permission android:name="android.car.permission.CAR_SPEED"/>
  <uses-permission android:name="android.car.permission.CAR_POWERTRAIN"/>
  <uses-feature android:name="android.hardware.type.automotive" android:required="true"/>
- <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="동행길" android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
+ <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="동행길" android:icon="@mipmap/donghaeng_launcher" android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
   <uses-library android:name="android.car" android:required="false"/>
   <activity android:name=".GroupSharingActivity" android:exported="false"><meta-data android:name="distractionOptimized" android:value="true"/></activity>
   <service android:name=".SharingService" android:exported="false" android:foregroundServiceType="location" android:stopWithTask="true"/>
