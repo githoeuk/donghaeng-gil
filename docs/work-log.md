@@ -737,3 +737,9 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 별도 실행에서 같은 최종 APK로 가상 체험을 만들고 D·22km/h의 이어가기·종료 잠금 화면을 캡처했다. 주행 중 UIAutomator XML 수집은 시간 초과됐다. 같은 실행에서 P·0km/h로 복귀하자 두 버튼이 활성화됐고 팀원 3대가 유지됐다. 종료 확정 뒤 팀원과 이어가기 버튼이 사라졌고 새 체험은 그룹 미참여·메시지 없음 상태였다. 전용 AVD는 정차 상태로 종료했다.
 - 화면 증거는 Git 제외 `.gradle/final-signed-*`의 `vehicle-verified`, `nav-return`, `resumed`, `drive-observed`, `final-parked`, `final-ended`, `final-reset`에 있다. 앱 소스는 수정하지 않았다.
 - Git Flow 적용을 위해 기존 `main`에서 로컬 `develop`을 만들고 `develop`에서 `release/0.1`을 분기했다. 이 검증 기록은 `release/0.1` 작업 트리에 보관했다.
+
+## 2026-11-09 — 제출용 README 시연 절차 정리
+
+- release/0.1에서 Pleos 실행, 서명 APK 설치, 시험 GPS와 검색할 목적지, 가상 체험 시작·복귀·종료 및 주행 잠금 확인 순서를 README에 정리했다.
+- 지도 배경과 GPS 갱신 제약을 기존 검증 기록에 맞춰 적었다. 오래된 Release 패키징 및 체험 화면 이탈 시 초기화 설명도 현행 동작에 맞췄다. 팀명과 APK 파일명·다운로드 경로는 확정 후 반영한다.
+- 문서 변경으로 기존 최종 서명 APK의 바이너리와 검증 결과를 재사용했다.
