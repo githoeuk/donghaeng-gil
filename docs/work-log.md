@@ -727,3 +727,13 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 정차 중 가상 그룹 생성·승인·공유 동의를 진행해 팀원 3대와 수신 메시지를 만들었다. Pleos 내비에서 같은 경로가 유지되는 것을 확인하고 앱으로 돌아와 이어가기를 눌렀다. 기존 수신 메시지와 ‘받은 메시지 확인’ 버튼이 유지됐다.
 - 첫 D·22km/h 시험에서 이어가기·종료가 회색으로 잠긴 화면을 캡처한 뒤 ADB 연결이 끊겼다. 전용 AVD를 재부팅해 같은 APK에서 재시험했다. D·22km/h에서 메인 이어가기·종료가 모두 비활성화됐고, P·0km/h로 복귀하자 두 버튼이 활성화되면서 팀원 3대가 유지됐다. 종료를 확정하면 이어가기와 팀원 요약이 사라졌고 새 체험은 그룹 미참여·메시지 없음 상태였다.
 - 정차 상태에서 검증 AVD를 종료했다. 화면 증거는 Git 제외 `.gradle/release-ui-*`의 `vehicle`, `overview`, `resumed`, `lock-observed`, `locked-retry`, `park`, `ended`, `reset`에 있다. 앱 소스 수정 없이 검증 기록만 추가했다.
+
+## 2026-11-08~09 — 최종 키 서명 및 제출 변형 시연 검증
+
+- 소스 `717493e`에서 `assembleSubmissionRelease`로 동행길 0.1(versionCode 1)을 빌드했다. 최종 RSA 3072비트 PKCS#12 키를 저장소 밖 접근 제한 폴더에 보관했다. 비밀번호는 현재 Windows 계정에 묶인 DPAPI로 보호했고 별도 PowerShell 프로세스에서 키를 다시 열 수 있는지 확인했다. 별도 매체 백업은 준비 전이다.
+- apksigner v2 검증을 통과했다. 인증서 SHA-256 `1a439939ec863151246c4348a81b6ac686ddfb883c59106c66fc97feb8e56a22`, APK SHA-256 `5A37EEBA71EEF4DC889E412091A018F1DD940FA0B7540395AD98CB769FADCA71`을 확인했다. 설치된 APK의 해시도 일치했다. 비디버그 구성과 가상 체험 Activity 비공개, Debug 진단·알림 시험 제외를 확인했다. 팀명 확정 전 APK는 Git 제외 `.gradle/donghaeng-gil-final-signed.apk`에 보관했다.
+- 별도 Pleos Connect v2.1.0 AVD에서 GPS를 내비 기준점 부근에 맞추고 `Starbucks`를 검색해 스타벅스 성남모란DT점으로 안내를 시작했다. 동행길에서 ‘수정구 시흥동’, 가게명과 ‘경기도 성남시 중원구 둔촌대로 131’, 약 14분·08:18 도착 예정·5.8km를 확인했다. 초기 내비 창 배치와 GPS 갱신·화면 수집 문제로 기본 내비를 다시 열고 전용 AVD를 `-gpu host` 실행 인자로 재시작했다. Pleos 지도 배경 제약은 남았다.
+- 같은 경로를 유지하며 정차 중 가상 체험을 시작하고 가상 팀원 3대와 수신 메시지 한 건을 만들었다. 내비로 이동해 같은 안내를 확인한 뒤 동행길에서 이어가기를 눌러 같은 팀원과 수신 메시지를 확인했다. UIAutomator idle 시간 초과가 난 복귀 화면은 스크린샷을 확인해 조작을 이어갔다.
+- 별도 실행에서 같은 최종 APK로 가상 체험을 만들고 D·22km/h의 이어가기·종료 잠금 화면을 캡처했다. 주행 중 UIAutomator XML 수집은 시간 초과됐다. 같은 실행에서 P·0km/h로 복귀하자 두 버튼이 활성화됐고 팀원 3대가 유지됐다. 종료 확정 뒤 팀원과 이어가기 버튼이 사라졌고 새 체험은 그룹 미참여·메시지 없음 상태였다. 전용 AVD는 정차 상태로 종료했다.
+- 화면 증거는 Git 제외 `.gradle/final-signed-*`의 `vehicle-verified`, `nav-return`, `resumed`, `drive-observed`, `final-parked`, `final-ended`, `final-reset`에 있다. 앱 소스는 수정하지 않았다.
+- Git Flow 적용을 위해 기존 `main`에서 로컬 `develop`을 만들고 `develop`에서 `release/0.1`을 분기했다. 이 검증 기록은 `release/0.1` 작업 트리에 보관했다.
