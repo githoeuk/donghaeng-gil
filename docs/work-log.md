@@ -754,3 +754,8 @@ HttpSharingTransport와 GroupSharingActivity에 accessVersion 확인·승인 대
 - 촬영용 Pleos Connect v2.1.0 AVD의 설치 APK 해시를 최종 서명본과 대조한 뒤, 실제 화면을 MP4로 녹화했다. 목적지 검색·안내 시작, 현재 주소·목적지·ETA, 정차 중 가상 그룹 생성·승인, 팀원 3대와 가상 수신 메시지, 내비 복귀 후 이어가기와 체험 종료를 담았다.
 - 대기 구간을 편집해 69.7초, 1920×1080, 30fps H.264 MP4로 만들었다. Pleos 내비 연동과 가상 체험을 한글 자막으로 구분했고, 지도 배경이 비는 경로 안내 장면은 각각 약 3초로 편집했다. 장면 모음을 시각 검토하고 전체 영상 디코딩 오류가 없음을 확인했다.
 - 초안과 원본은 Git 제외 `.gradle/demo-video/`에 보관했다. 초안은 `donghaeng-gil-demo-draft.mp4`다. 팀명과 APK 파일명은 보류했다.
+
+## 2026-11-09 — 동행길 런처 아이콘 적용
+
+- 선택한 1번 ‘합류하는 길’ 시안을 Android 적응형 런처 아이콘으로 추가했다. Pleos 앱 목록에서 민트색과 하늘색 차선이 원형 아이콘 안에 표시되는 것을 확인했다. 확인 화면은 Git 제외 `.gradle/donghaeng-icon-check.png`에 보관했다.
+- standardDebug 빌드와 submissionRelease 리소스 처리를 통과했다. 기존 최종 서명 APK와 시연 영상은 아이콘 적용 전 산출물이며 이번 작업에서 다시 생성하지 않았다.
