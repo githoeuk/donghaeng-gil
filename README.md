@@ -6,7 +6,7 @@
 
 ## 작업 전 참고
 
-[제출용 Release 가이드라인](docs/submission-release-guidelines.md)을 기능·빌드·권한·시연 작업의 기준으로 사용합니다. 제출용 모의 시연 포함과 서명 기준을 정리한 문서입니다. 최종 키로 서명한 제출 변형을 Pleos에서 검증했습니다. APK 파일명과 저장소 내 다운로드 경로는 팀명 확정 후 반영합니다. 설치와 시연은 [Pleos 에뮬레이터 시연](#pleos-에뮬레이터-시연)을 참고하세요.
+[제출용 Release 가이드라인](docs/submission-release-guidelines.md)을 기능·빌드·권한·시연 작업의 기준으로 사용합니다. 제출용 모의 시연 포함과 서명 기준을 정리한 문서입니다. 최종 키로 서명한 제출 변형을 Pleos에서 검증했습니다. 공모전 팀명은 **동행길**이며, 제출 파일은 [동행길_동행길_release.apk](apk/동행길_동행길_release.apk)입니다. 설치와 시연은 [Pleos 에뮬레이터 시연](#pleos-에뮬레이터-시연)을 참고하세요.
 
 ## 현재 구현 상태
 
@@ -69,12 +69,12 @@ macOS / Linux에서는 `sh ./gradlew assembleStandardDebug`를 실행합니다.
 ### 에뮬레이터 실행과 APK 설치
 
 1. [Pleos 공식 설치 가이드](https://document.pleos.ai/en/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)에 따라 Android Studio의 **Device Manager**에서 **Pleos Connect v2.1.0 APIs (Android API 34)** 가상 기기를 준비합니다. Cold Boot로 시작한 뒤 기본 내비가 열릴 때까지 기다립니다.
-2. Android SDK의 `platform-tools`에 있는 `adb`로 서명된 제출용 APK를 설치합니다. 예시의 기기 ID와 APK 경로는 실제 값으로 바꿉니다. 다른 서명으로 설치된 동행길이 있는 경우 새 AVD를 사용합니다.
+2. Android SDK의 `platform-tools`에 있는 `adb`로 서명된 제출용 APK를 설치합니다. 아래 명령은 저장소 루트에서 실행합니다. 기기 ID가 다르면 adb devices에 나온 값으로 바꿉니다. APK를 별도로 내려받았다면 다운로드한 경로를 사용합니다. 다른 서명으로 설치된 동행길이 있는 경우 새 AVD를 사용합니다.
 3. 앱 목록에서 **동행길**을 엽니다. **내 위치 사용**을 눌러 정확한 위치를 허용하고, **차량 상태 접근 허용**이 표시되면 허용합니다. 가상 체험은 **P 기어·0km/h·플랫폼 제한 없음**이 확인되면 시작할 수 있습니다.
 
 ```powershell
 adb devices
-adb -s emulator-5554 install "<다운로드한 Release APK 경로>"
+adb -s emulator-5554 install "apk/동행길_동행길_release.apk"
 ```
 
 ### 시험 GPS와 목적지 설정
