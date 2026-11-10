@@ -51,7 +51,7 @@ public final class SharingDemoActivity extends Activity {
         root.addView(text("동행길 · 가상 차량 체험", 28));
         root.addView(text("체험 화면의 차량·주소·메시지는 모두 가상이며 외부로 전송하지 않습니다. 실제 내 차량 정보는 메인 화면에서 확인하세요.", 16));
         LinearLayout sessionActions = row();
-        sessionActions.addView(button("내 차량 화면으로", this::finish));
+        sessionActions.addView(button("← 메인으로", this::finish));
         sessionActions.addView(button("체험 종료", this::endDemo));
         root.addView(sessionActions);
         status = text("", 17); root.addView(status);
@@ -212,7 +212,7 @@ public final class SharingDemoActivity extends Activity {
         }
         if (!parkingSource.hasPermission()) locked.addView(button("차량 상태 접근 허용", () ->
                 requestPermissions(new String[]{VehicleParkingSource.SPEED_PERMISSION}, 21)));
-        locked.addView(button("내 차량 화면으로", this::finish)); setContentView(locked);
+        locked.addView(button("← 메인으로", this::finish)); setContentView(locked);
     }
     private Button demoButton(String label, Runnable action) {
         return button(label, () -> {

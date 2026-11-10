@@ -69,6 +69,7 @@ public final class GroupSharingActivity extends Activity {
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(14,24,34));
         LinearLayout root=column(); root.setPadding(28,18,28,24); scroll.addView(root);
         root.addView(text("동행길 · 동행 차량과 공유",26));
+        root.addView(button("← 메인으로",this::returnToMain),new LinearLayout.LayoutParams(-2,-2));
         root.addView(text("공유를 시작하면 동행 차량이 내 위치·목적지·예상 도착 시간을 볼 수 있습니다. 내비를 보는 중에도 공유되며, 화면이나 알림에서 중지할 수 있습니다.",16));
         safety=text("차량 상태 확인 중",16);root.addView(safety);
         Button permissions=parkedButton("위치·차량 상태 권한",()->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,VehicleParkingSource.SPEED_PERMISSION},22));root.addView(permissions);
@@ -112,11 +113,16 @@ public final class GroupSharingActivity extends Activity {
         }
         management=column();root.addView(management);
         messages=column();root.addView(messages);
-        root.addView(button("내 차량 화면으로",this::finish));
         // These controls also depend on connection/group state; apply their final state only once per render.
         for(View control:new View[]{endpoint,name,connectButton,settingsToggle,createGroup,joinGroup,code,startSharing})parkedControls.remove(control);
         setContentView(scroll);
         parkingSource=new VehicleParkingSource(this,parking,this::render);
+    }
+    private void returnToMain(){
+        Intent main=new Intent(this,MainActivity.class);
+        main.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(main);
+        finish();
     }
     private void copyInviteCode(){
         if(relay==null)return;
