@@ -28,3 +28,4 @@ Thumbs.db
 
 # Explicit submission artifacts may be added here
 !artifacts/*.apk
+!/apk/동행길_동행길_release.apk
