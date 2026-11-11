@@ -66,9 +66,21 @@ macOS / Linux에서는 `sh ./gradlew assembleStandardDebug`를 실행합니다.
 
 ## Pleos 에뮬레이터 시연
 
+### 시연 영상과 화면
+
+[제출용 시연 영상 MP4 다운로드](docs/demo/donghaeng-gil-demo.mp4?raw=true) · 69.83초 · 1920×1080
+
+**Pleos 내비 연동** — 시험 GPS를 사용한 현재 주소, 목적지 상세주소, 도착 예정 시각입니다.
+
+![Pleos 내비 연동 화면](docs/demo/pleos-navigation.png)
+
+**가상 체험** — 모의 팀원과 메시지를 확인한 뒤 메인으로 돌아갔다가 같은 체험을 이어갑니다.
+
+![가상 체험 메인 복귀와 이어가기 GIF](docs/demo/demo-return.gif)
+
 ### 에뮬레이터 실행과 APK 설치
 
-1. [Pleos 공식 설치 가이드](https://document.pleos.ai/en/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)에 따라 Android Studio의 **Device Manager**에서 **Pleos Connect v2.1.0 APIs (Android API 34)** 가상 기기를 준비합니다. Cold Boot로 시작한 뒤 기본 내비가 열릴 때까지 기다립니다.
+1. [Pleos 공식 설치 가이드](https://document.pleos.ai/en/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)에 따라 Android Studio의 **Device Manager**에서 **Pleos Connect v2.1.0 APIs (Android API 34)** 가상 기기를 준비합니다. 검증한 에뮬레이터 화면 규격은 2560×1440입니다. Cold Boot로 시작한 뒤 기본 내비가 열릴 때까지 기다립니다.
 2. Android SDK의 `platform-tools`에 있는 `adb`로 서명된 제출용 APK를 설치합니다. 아래 명령은 저장소 루트에서 실행합니다. 기기 ID가 다르면 adb devices에 나온 값으로 바꿉니다. APK를 별도로 내려받았다면 다운로드한 경로를 사용합니다. 다른 서명으로 설치된 동행길이 있는 경우 새 AVD를 사용합니다.
 3. 앱 목록에서 **동행길**을 엽니다. **내 위치 사용**을 눌러 정확한 위치를 허용하고, **차량 상태 접근 허용**이 표시되면 허용합니다. 가상 체험은 **P 기어·0km/h·플랫폼 제한 없음**이 확인되면 시작할 수 있습니다.
 
